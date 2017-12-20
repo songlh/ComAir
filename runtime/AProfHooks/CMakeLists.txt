@@ -1,6 +1,8 @@
 add_library(AProfHooks STATIC
         # List your source files here.
         AProfHooks.c
+	hashmap.c
+	inputpro.c
         )
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).

@@ -198,7 +198,7 @@ void read(unsigned long startaddr, unsigned int length) {
 			printf("read(): ts[startaddr] update failure\n");
 		}
 		
-		i += 8;// continue on next byte
+		i++;// continue on next byte
 	}
 		
 }

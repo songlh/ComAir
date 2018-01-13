@@ -1,6 +1,6 @@
 
 #ifndef SLOTLENGTH
-#define SLOTLENGTH 65536  // a large prime use
+#define SLOTLENGTH 54018521  // a large prime use
 #endif
 
 #ifndef MAP_MISS
@@ -47,7 +47,7 @@ int hashMapRemove(char *key);
 unsigned int keyToIndex(char *key);
 
 
-int hashMapPut(char *key, unsigned int value);
+int hashMapPut(char *key, unsigned long value);
 
 
 int hashMapGet(char *key);

@@ -17,27 +17,34 @@ struct AprofHook : public ModulePass
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
     virtual bool runOnModule(Module& M);
 
-    void SetupInit(Module *);
-    void SetupTypes(Module *);
-    void SetupConstants(Module *);
-    void SetupGlobals(Module *);
-    void SetupFunctions(Module *);
-    void SetupHooks(Module *);
+    void SetupInit();
+    void SetupTypes();
+    void SetupConstants();
+    void SetupGlobals();
+    void SetupFunctions();
+    void SetupHooks();
 
     void InsertAprofInit(Instruction *);
     void InsertAProfIncrementCost(Instruction *);
+    void InsertAprofWrite(Value *, Instruction *);
+
+    // Module
+    Module *pModule;
 
     //type
     IntegerType * IntType;
     IntegerType * LongType;
     Type * VoidType;
+    PointerType* VoidPointerType;
 
     /* function */
 
     // int aprof_init()
     Function * aprof_init;
-
+    // void aprof_increment_cost()
     Function * aprof_increment_cost;
+    // void aprof_write(unsigned long start_addr, unsigned int length)
+    Function *aprof_write;
 
     //global
     GlobalVariable * aprof_count;

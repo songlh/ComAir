@@ -16,3 +16,21 @@ add_library(AProfHooks STATIC
 target_include_directories(AProfHooks
         PUBLIC ${LIB_INCLUDE}
         )
+
+## TODO: this is for testing runtime lib.
+############################################################
+# Create an executable
+############################################################
+
+# Source fles for the binary
+set(BINARY_SOURCES
+        src/test_runtime.c
+        )
+
+# Add an executable with the above sources
+add_executable(testHook ${BINARY_SOURCES})
+
+# link the new hello_library target with the hello_binary target
+target_link_libraries(testHook
+        PRIVATE AProfHooks
+        )

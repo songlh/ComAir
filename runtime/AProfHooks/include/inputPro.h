@@ -46,7 +46,7 @@ void aprof_return();
 void aprof_read(unsigned long variable_address, unsigned int length);
 
 
-void aprof_write(unsigned long variable_address, unsigned int length);
+void aprof_write(void *memory_addr, unsigned int length);
 
 
 void aprof_collect(); //cost collection to be finished

@@ -1,9 +1,6 @@
 #include <stdio.h>
 
 #include "AProfHooks.h"
-#include "common.h"
-#include "hashMap.h"
-#include "inputPro.h"
 
 
 int aprof_init() {

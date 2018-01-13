@@ -270,36 +270,32 @@ void aprof_read(unsigned long startAddr, unsigned int length) {
 
 }
 
-void aprof_write(unsigned long int startAddr, unsigned int length) {
+void aprof_write(void *memory_addr, unsigned int length) {
 
     unsigned long i;
-    unsigned int j, l, stack_result;
+    unsigned int j;
     long hash_map_result;
-    char *string_addr, *key;
-    key = (char *) malloc(30 * sizeof(char));
-
-    if (key == NULL) {
-        printf("read(): memory allocation error\n");
-        exit(0);
-    }
+    char string_addr[30];
+    unsigned long start_addr = (unsigned long) memory_addr;
 
     j = length; // j records byte length
 
-    for (i = startAddr; j > 0; j--) {
+    for (i = start_addr; j > 0; j--) {
 
         sprintf(string_addr, "%lx", i); // turn i into hex string address, string_addr is w
         hash_map_result = hashMapPut(string_addr, count); // ts[string_addr] = count;
 
         if (hash_map_result >= 0) {
 
-            printf("write(): ts[startAddr] update successful\n");
+            printf("write(): ts[start_addr] update successful\n");
 
         } else {
 
-            printf("write(): ts[startAddr] update failure\n");
+            printf("write(): ts[start_adrr] update failure\n");
         }
 
-        i += 8;
+        // FIXME::I think maybe should be i++?
+        i++;
     }
 }
 

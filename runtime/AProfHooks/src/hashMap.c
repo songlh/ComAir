@@ -128,7 +128,13 @@ int hashMapRemove(char *key) {
     }
 }
 
-int hashMapPut(char *key, unsigned int value) {  // return oldvalue of elem <key,value>
+/**
+ *
+ * @param key
+ * @param value
+ * @return old value of elem <key,value>
+ */
+int hashMapPut(char *key, unsigned long value) {
     struct _hashMapElem *p, *q;
     char *start_addr = key;
     int oldvalue;
@@ -169,14 +175,16 @@ int hashMapPut(char *key, unsigned int value) {  // return oldvalue of elem <key
         hMap->size++;
         hMap->totalElem++;
 
-        //printf("successfully added one element to elements[%d], key is %s, value is %d.\n", index, hMap->elements[index]->key,hMap->elements[index]->value);
+//        printf("successfully added one element to elements[%d], key is %s, value is %d.\n", index, hMap->elements[index]->key,hMap->elements[index]->value);
         return MAP_SUCCESS;
 
     } else { // the index slot is not empty
 
         q = hMap->elements[index];
-        if (!strcmp(q->key, key)) { // the put element is the first elem
-            //printf("the put element is the first element of elements[%u]\n",index);
+
+        if (!strcmp(q->key, key)) {
+            // the put element is the first elem
+//            printf("the put element is the first element of elements[%u]\n",index);
             oldvalue = q->value;
             q->value = value;
             return oldvalue;
@@ -187,38 +195,45 @@ int hashMapPut(char *key, unsigned int value) {  // return oldvalue of elem <key
 
                 if (!strcmp(q->next->key, key)) {
 
-                    //printf("the put element is in the list of elements[%u]\n",index);
+//                    printf("the put element is in the list of elements[%u]\n",index);
                     oldvalue = q->next->value;
                     q->next->value = value;
                     return oldvalue;
                 }
+
                 q = q->next;
             }
 
             //printf("the put element is not in the list of elements[%u]\n",index);
-            p = (struct _hashMapElem *) malloc(
-                    sizeof(struct _hashMapElem)); //the put element is not in the list. put the new element at the first position
+            //the put element is not in the list. put the new element at the first position
+            p = (struct _hashMapElem *) malloc(sizeof(struct _hashMapElem));
 
             if (p == NULL) {
 
-                printf("Error in HashMapPut() 2, HashMapelem allocation error.\n");
+//                printf("Error in HashMapPut() 2, HashMapelem allocation error.\n");
                 return -1;
             }
 
             p->key = key;
             p->value = value;
             p->next = NULL;
-            p->next = hMap->elements[index]; // ***here needs to be very careful. insert the put node as the first node
+            // ***here needs to be very careful. insert the put node as the first node
+            p->next = hMap->elements[index];
             hMap->elements[index] = p;
             hMap->totalElem++;
-            //printf("successfully added one element to the list of elements[%d], key is %s, value is %d.\n", index, hMap->elements[index]->key,hMap->elements[index]->value);
+//            printf("successfully added one element to the list of elements[%d], key is %s, value is %d.\n", index, hMap->elements[index]->key,hMap->elements[index]->value);
             return MAP_SUCCESS;
 
         }
     }
 }
 
-int hashMapGet(char *key) { // key points to a string showing an address in hex format
+/**
+ * key points to a string showing an address in hex format
+ * @param key
+ * @return
+ */
+int hashMapGet(char *key) {
     unsigned int index;
     struct _hashMapElem *p, *q;
     //printf("---------entering HashMapGet().\n");
@@ -277,11 +292,11 @@ int hashMapGet(char *key) { // key points to a string showing an address in hex 
 unsigned long int stringToInt(char *str) {
 
     unsigned long int intaddr;
-    if (str == NULL) {// str is NULL
+    if (str == NULL) {
         printf("Error in stringToInt(), empty str\n");
         return -1;
     } else {
-        intaddr = strtol(str, NULL, 0);
+        intaddr = strtol(str, NULL, 16);
         return intaddr;
     }
 }

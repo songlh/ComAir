@@ -55,4 +55,4 @@ void aprof_collect(); //cost collection to be finished
 unsigned long aprof_get_cost();
 
 
-unsigned long aprof_count_bb();
+void aprof_increment_cost();

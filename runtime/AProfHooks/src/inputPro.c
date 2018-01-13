@@ -304,6 +304,6 @@ void aprof_write(unsigned long int startAddr, unsigned int length) {
 }
 
 
-unsigned long aprof_count_bb() {
-    return bb_count++;
+void aprof_increment_cost() {
+    bb_count++;
 }

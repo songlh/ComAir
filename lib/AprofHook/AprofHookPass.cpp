@@ -28,7 +28,6 @@ void AprofHook::SetupTypes(Module *pModule) {
     this->LongType = IntegerType::get(pModule->getContext(), 64);
 }
 
-
 void AprofHook::SetupConstants(Module *pModule) {
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
     this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
@@ -53,18 +52,35 @@ void AprofHook::SetupGlobals(Module *pModule) {
     this->aprof_bb_count->setInitializer(this->ConstantLong0);
 }
 
-void AprofHook::InsertAprofInit(Module *pModule, Instruction *firstInst) {
+void AprofHook::SetupFunctions(Module *pModule) {
     std::vector<Type *> ArgTypes;
     FunctionType *AprofInitType = FunctionType::get(this->IntType, ArgTypes, false);
     this->aprof_init = Function::Create
             (AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", pModule);
 
-    CallInst *aprof_init_call =  CallInst::Create(this->aprof_init, "", firstInst);
+
+    FunctionType *AprofIncrementCostType = FunctionType::get(this->VoidType, ArgTypes, false);
+    this->aprof_increment_cost = Function::Create
+            (AprofIncrementCostType, GlobalValue::ExternalLinkage, "aprof_increment_cost", pModule);
+
+}
+
+void AprofHook::InsertAprofInit(Instruction *firstInst) {
+    CallInst *aprof_init_call = CallInst::Create(this->aprof_init, "", firstInst);
     aprof_init_call->setCallingConv(CallingConv::C);
     aprof_init_call->setTailCall(false);
-    AttributeList int32_call2_PAL;
-    aprof_init_call->setAttributes(int32_call2_PAL);
+    AttributeList int32_call_PAL;
+    aprof_init_call->setAttributes(int32_call_PAL);
 
+}
+
+void AprofHook::InsertAProfIncrementCost(Instruction *BeforeInst) {
+    CallInst *aprof_increment_cost_call = CallInst::Create(
+            this->aprof_increment_cost, "", BeforeInst);
+    aprof_increment_cost_call->setCallingConv(CallingConv::C);
+    aprof_increment_cost_call->setTailCall(false);
+    AttributeList void_call_PAL;
+    aprof_increment_cost_call->setAttributes(void_call_PAL);
 }
 
 void AprofHook::SetupInit(Module *pModule) {
@@ -72,6 +88,7 @@ void AprofHook::SetupInit(Module *pModule) {
     SetupTypes(pModule);
     SetupConstants(pModule);
     SetupGlobals(pModule);
+    SetupFunctions(pModule);
 }
 
 void AprofHook::SetupHooks(Module *pModule) {
@@ -83,7 +100,19 @@ void AprofHook::SetupHooks(Module *pModule) {
     if (MainFunc) {
 
         Instruction *firstInst = &*(MainFunc->begin()->begin());
-        InsertAprofInit(pModule, firstInst);
+        InsertAprofInit(firstInst);
+    }
+
+    for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
+
+        Function *Func = &*FI;
+
+        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+
+            BasicBlock *BB = &*BI;
+            Instruction *firstInst = &*(BB->begin());
+            InsertAProfIncrementCost(firstInst);
+        }
     }
 }
 

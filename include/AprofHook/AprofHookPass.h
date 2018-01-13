@@ -14,8 +14,6 @@ struct AprofHook : public ModulePass
     static char ID;
     AprofHook();
 
-
-
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
     virtual bool runOnModule(Module& M);
 
@@ -23,9 +21,11 @@ struct AprofHook : public ModulePass
     void SetupTypes(Module *);
     void SetupConstants(Module *);
     void SetupGlobals(Module *);
+    void SetupFunctions(Module *);
     void SetupHooks(Module *);
 
-    void InsertAprofInit(Module *, Instruction *);
+    void InsertAprofInit(Instruction *);
+    void InsertAProfIncrementCost(Instruction *);
 
     //type
     IntegerType * IntType;
@@ -37,6 +37,8 @@ struct AprofHook : public ModulePass
     // int aprof_init()
     Function * aprof_init;
 
+    Function * aprof_increment_cost;
+
     //global
     GlobalVariable * aprof_count;
     GlobalVariable * aprof_bb_count;
@@ -46,6 +48,5 @@ struct AprofHook : public ModulePass
     ConstantInt * ConstantLong1;
 
 };
-
 
 #endif //COMAIR_APROFHOOKPASS_H

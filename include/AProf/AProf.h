@@ -19,14 +19,14 @@ struct AlgoProfiling : public ModulePass
 	virtual void getAnalysisUsage(AnalysisUsage &AU) const;
 	virtual bool runOnModule(Module& M);
 
-
+    void SetupInit(Module *);
 	void SetupTypes(Module *);
 	void SetupConstants(Module *);
 	void SetupGlobals(Module *);
 	void SetupHooks(Module *);
 
-	void InstrumentCostUpdater(BasicBlock * );
-	void InstrumentResultDumper(Function * );
+	void InstrumentCostUpdater(BasicBlock *);
+	void InstrumentResultDumper(Function *);
 
 //type
 	IntegerType * LongType;

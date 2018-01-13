@@ -1,0 +1,7 @@
+cmake-build-debug/*
+
+.idea/*
+
+temp-test/*
+
+stubs/example/*

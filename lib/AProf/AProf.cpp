@@ -54,6 +54,15 @@ void AlgoProfiling::SetupHooks(Module * pModule)
 	this->PrintExecutionCost = Function::Create(PrintExecutionCostType, GlobalValue::ExternalLinkage, "PrintExecutionCost", pModule);
 }
 
+void AlgoProfiling::SetupInit(Module * pModule)
+{
+	// all set up operation
+	SetupTypes(pModule);
+	SetupConstants(pModule);
+	SetupGlobals(pModule);
+	SetupHooks(pModule);
+}
+
 void AlgoProfiling::InstrumentCostUpdater(BasicBlock * pBlock)
 {
 	TerminatorInst * pTerminator = pBlock->getTerminator();
@@ -95,10 +104,8 @@ void AlgoProfiling::InstrumentResultDumper(Function * pMain)
 
 bool AlgoProfiling::runOnModule(Module & M)
 {
-	SetupTypes(&M);
-	SetupConstants(&M);
-	SetupGlobals(&M);
-	SetupHooks(&M);
+	// setup init
+	SetupInit(&M);
 
 
 	for(Module::iterator FI = M.begin(); FI != M.end(); FI ++ )

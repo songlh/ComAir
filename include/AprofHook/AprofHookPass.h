@@ -29,6 +29,7 @@ struct AprofHook : public ModulePass
     void InsertAprofInit(Instruction *);
     void InsertAprofIncrementCost(Instruction *);
     void InsertAprofWrite(Value *, Instruction *);
+    void InsertAprofRead(Value *, Instruction *);
     void InsertAprofCallBefore(std::string FuncName, Instruction *BeforeCallInst);
     void InsertAprofCallAfter(Instruction *AfterCallInst);
 
@@ -50,6 +51,8 @@ struct AprofHook : public ModulePass
     Function * aprof_increment_cost;
     // void aprof_write(void *memory_addr, unsigned int length)
     Function *aprof_write;
+    // void aprof_read(void *memory_addr, unsigned int length)
+    Function *aprof_read;
     // void aprof_call_before(char *funcName)
     Function *aprof_call_before;
     // void aprof_call_after()

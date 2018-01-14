@@ -43,7 +43,7 @@ void aprof_call(char *funcName);
 void aprof_return();
 
 
-void aprof_read(unsigned long variable_address, unsigned int length);
+void _aprof_read(void *memory_addr, unsigned int length);
 
 
 void _aprof_write(void *memory_addr, unsigned int length);

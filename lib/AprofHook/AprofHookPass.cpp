@@ -87,6 +87,15 @@ void AprofHook::SetupFunctions() {
     this->aprof_write->setCallingConv(CallingConv::C);
     ArgTypes.clear();
 
+    // aprof_read
+    ArgTypes.push_back(this->VoidPointerType);
+    ArgTypes.push_back(this->IntType);
+    FunctionType *AprofReadType = FunctionType::get(this->VoidType, ArgTypes, false);
+    this->aprof_read = Function::Create
+            (AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
+    this->aprof_read->setCallingConv(CallingConv::C);
+    ArgTypes.clear();
+
     // aprof_call_before
     PointerType *CharPointer = PointerType::get(
             IntegerType::get(pModule->getContext(), 8), 0);
@@ -149,6 +158,32 @@ void AprofHook::InsertAprofWrite(Value *var, Instruction *BeforeInst) {
     void_51->setAttributes(void_PAL);
 
 }
+
+void AprofHook::InsertAprofRead(Value *var, Instruction *BeforeInst) {
+
+    DataLayout *dl = new DataLayout(this->pModule);
+    Type *type_1 = var->getType()->getContainedType(0);
+
+    while (isa<PointerType>(type_1))
+        type_1 = type_1->getContainedType(0);
+
+    ConstantInt *const_int6 = ConstantInt::get(
+            this->pModule->getContext(),
+            APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+
+    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
+                                       "", BeforeInst);
+    std::vector<Value *> void_51_params;
+    void_51_params.push_back(ptr_50);
+    void_51_params.push_back(const_int6);
+    CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", BeforeInst);
+    void_51->setCallingConv(CallingConv::C);
+    void_51->setTailCall(false);
+    AttributeList void_PAL;
+    void_51->setAttributes(void_PAL);
+
+}
+
 
 void AprofHook::InsertAprofCallBefore(std::string FuncName, Instruction *BeforeCallInst) {
 
@@ -259,7 +294,7 @@ void AprofHook::SetupHooks() {
                             secondOpType = secondOpType->getContainedType(0);
                         }
 
-                        // ignore function pointer store!
+                        // FIXME::ignore function pointer store!
                         if (!isa<FunctionType>(secondOpType)) {
                             InsertAprofWrite(secondOp, Inst);
                         }
@@ -282,6 +317,23 @@ void AprofHook::SetupHooks() {
                         }
                         break;
                     }
+
+                    case Instruction::Load: {
+                        // load instruction only has one operand !!!
+                        Value *secondOp = Inst->getOperand(0);
+                        Type *secondOpType = secondOp->getType();
+
+                        while (isa<PointerType>(secondOpType)) {
+                            secondOpType = secondOpType->getContainedType(0);
+                        }
+
+                        // FIXME::ignore function pointer store!
+                        if (!isa<FunctionType>(secondOpType)) {
+                            InsertAprofRead(secondOp, Inst);
+                        }
+
+                        break;
+                    }
                 }
             }
         }
@@ -289,6 +341,7 @@ void AprofHook::SetupHooks() {
 }
 
 bool AprofHook::runOnModule(Module &M) {
+
     this->pModule = &M;
     SetupHooks();
 

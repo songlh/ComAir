@@ -25,6 +25,10 @@ void aprof_write(void *memory_addr, unsigned int length) {
     _aprof_write(memory_addr, length);
 }
 
+void aprof_read(void *memory_addr, unsigned int length) {
+    _aprof_read(memory_addr, length);
+}
+
 void aprof_increment_cost() {
     _aprof_increment_cost();
 }

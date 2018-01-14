@@ -22,7 +22,7 @@
 
 typedef struct _hashMapElem {
     char *key;  // indicate the address of the memory cell
-    unsigned int value;   // indicate the latest access of the memory cell
+    unsigned long value;   // indicate the latest access of the memory cell
     struct _hashMapElem *next; // linked to the next element
     int hash;
 } hashMapElem;

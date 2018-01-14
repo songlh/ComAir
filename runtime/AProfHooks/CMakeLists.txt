@@ -3,6 +3,7 @@ set(LIB_SOURCES
         src/AProfHooks.c
         src/hashMap.c
         src/inputPro.c
+        src/logger.c
         )
 
 set(LIB_INCLUDE

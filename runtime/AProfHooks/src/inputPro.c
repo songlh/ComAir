@@ -152,20 +152,20 @@ int popStackElem() {
     if (psStack == NULL) {
 
         printf("popStackElem(): stack pointer is NULL\n");
-        return -1;
+        return STATUS_NULL;
 
     }
 
     if (psStack->top == 0) {
 
         printf("popStackElem(): stack is empty\n");
-        return -1;
+        return STATUS_NULL;
 
     } else {
 
         psStack->top--;
         psStack->elementsNum--;
-        return 0;
+        return STATUS_SUCCESS;
     }
 }
 
@@ -201,9 +201,10 @@ void aprof_collect() {
 }
 
 
-void aprof_return() {
+void _aprof_return() {
 
     if (psStack == NULL) {
+
         printf("aprof_return(): stack pointer is NULL\n");
         return;
     }
@@ -211,9 +212,10 @@ void aprof_return() {
     aprof_collect();
 
     if (psStack->top > 1) {
+        unsigned long stack_top = psStack->top - 1;
         // stack has at least two elements.
-        psStack->StackElements[psStack->top - 2].rms +=
-                psStack->StackElements[psStack->top - 1].rms;
+        psStack->StackElements[stack_top - 1].rms +=
+                psStack->StackElements[stack_top].rms;
     }
 
     popStackElem();

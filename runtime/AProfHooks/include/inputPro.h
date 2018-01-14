@@ -49,7 +49,7 @@ void _aprof_read(void *memory_addr, unsigned int length);
 void _aprof_write(void *memory_addr, unsigned int length);
 
 
-void aprof_collect(); //cost collection to be finished
+void _aprof_collect(); //cost collection to be finished
 
 
 unsigned long aprof_get_cost();

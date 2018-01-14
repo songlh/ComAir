@@ -220,52 +220,64 @@ void aprof_return() {
 }
 
 
-void aprof_read(unsigned long startAddr, unsigned int length) {
+void _aprof_read(void *memory_addr, unsigned int length) {
 
-    /* just in case the input parameter startAddr is char *
-        unsigned long int i;
-        unsigned int j,l;
-    */
+    char string_addr[30];
+    unsigned long stack_top;
+    unsigned int j = length; // j records byte length
+    unsigned long startAddr = (unsigned long) memory_addr;
 
-    unsigned long i;
-    unsigned int j, l, stack_result;
-    long hash_map_result;
-    char *string_addr, *key;
-    key = (char *) malloc(30 * sizeof(char));
+    for (unsigned long i = startAddr; j > 0; j--) {
 
-    if (key == NULL) {
-        printf("read(): memory allocation error\n");
-        exit(0);
-    }
+        // turn i into hex string address, string_addr is w
+        sprintf(string_addr, "%lx", i);
 
-    j = length; // j records byte length
+        // hash_map_result records the ts[string_addr]
+        int hash_map_result = hashMapGet(string_addr);
 
-    for (i = startAddr; j > 0; j--) { // i is the address of current byte
+        // stack_top should be the top of the stack
+        stack_top = psStack->top - 1;
 
-        sprintf(string_addr, "%lx", i); // turn i into hex string address, string_addr is w
-        hash_map_result = hashMapGet(string_addr); // hash_map_result records the ts[string_addr]
-        stack_result = psStack->StackElements[psStack->top - 1].ts; //stack_result records the S[top].ts
+        //stack_result records the S[top].ts
+        unsigned long stack_result = psStack->StackElements[stack_top].ts;
 
-        if (hash_map_result < stack_result) {  // ts[string_addr] < S[top].ts
-            psStack->StackElements[psStack->top - 1].rms++;
-            if (hash_map_result > 0) { // ts[w] != 0
-                l = psStack->top - 1; //S[l] is S[top]
-                while (psStack->StackElements[l].ts >
-                       hash_map_result) //l be the max index in S such that S[l].ts<=ts[string_addr]
-                    l--;
-                psStack->StackElements[l].rms--; //S[i].rms--
+        // ts[string_addr] < S[top].ts
+        if (hash_map_result < stack_result) {
+
+            psStack->StackElements[stack_top].rms++;
+
+            // ts[w] != 0
+            if (hash_map_result > 0) {
+
+                // stack_top be the max index in S such that S[l].ts<=ts[string_addr]
+                while (psStack->StackElements[stack_top].ts > hash_map_result && stack_top > 0) {
+                    stack_top--;
+                }
+
+                if (stack_top <= 0) {
+                    printf("There is error in finding max index in Stack!");
+                    exit(0);
+                }
+
+                //S[i].rms--
+                psStack->StackElements[stack_top].rms--;
             }
         }
 
-        hash_map_result = hashMapPut(string_addr, count); // ts[string_addr] = count;
+        // ts[string_addr] = count; count is global variable!
+        hash_map_result = hashMapPut(string_addr, count);
 
         if (hash_map_result >= 0) {
+
             printf("read(): ts[startAddr] update successful\n");
+
         } else {
+
             printf("read(): ts[startAddr] update failure\n");
         }
 
-        i++;// continue on next byte
+        // continue on next byte
+        i++;
     }
 
 }

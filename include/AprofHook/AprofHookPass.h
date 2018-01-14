@@ -8,6 +8,8 @@
 
 
 using namespace llvm;
+using namespace std;
+
 
 struct AprofHook : public ModulePass
 {
@@ -25,34 +27,44 @@ struct AprofHook : public ModulePass
     void SetupHooks();
 
     void InsertAprofInit(Instruction *);
-    void InsertAProfIncrementCost(Instruction *);
+    void InsertAprofIncrementCost(Instruction *);
     void InsertAprofWrite(Value *, Instruction *);
+    void InsertAprofCallBefore(std::string FuncName, Instruction *BeforeCallInst);
+    void InsertAprofCallAfter(Instruction *AfterCallInst);
 
-    // Module
+    /* Module */
     Module *pModule;
+    /* ********** */
 
-    //type
+    /* Type */
     IntegerType * IntType;
     IntegerType * LongType;
     Type * VoidType;
     PointerType* VoidPointerType;
+    /* ********** */
 
-    /* function */
-
+    /* Function */
     // int aprof_init()
     Function * aprof_init;
     // void aprof_increment_cost()
     Function * aprof_increment_cost;
-    // void aprof_write(unsigned long start_addr, unsigned int length)
+    // void aprof_write(void *memory_addr, unsigned int length)
     Function *aprof_write;
+    // void aprof_call_before(char *funcName)
+    Function *aprof_call_before;
+    // void aprof_call_after()
+    Function *aprof_call_after;
+    /* ********** */
 
-    //global
+    /* Global Variable */
     GlobalVariable * aprof_count;
     GlobalVariable * aprof_bb_count;
+    /* ********** */
 
-    //constant
+    /* Constant */
     ConstantInt * ConstantLong0;
     ConstantInt * ConstantLong1;
+    /* ********** */
 
 };
 

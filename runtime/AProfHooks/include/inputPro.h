@@ -13,13 +13,13 @@ typedef struct _ShadowStackElem {
 
 typedef struct _ShadowStack {
     struct _ShadowStackElem *StackElements;
-    unsigned long top; // ****extra attention, stackelemets[top-1] is the top element.
+    unsigned long top; // ****extra attention, stack elements[top-1] is the top element.
     unsigned long size; // current size of the stack
     unsigned long elementsNum; // the size for the next expand
 } ShadowStack;
 
 
-int pushStackElem(char *funcName, unsigned long ts);
+int pushStackElem(char *funcName);
 
 
 int popStackElem();
@@ -46,7 +46,7 @@ void aprof_return();
 void aprof_read(unsigned long variable_address, unsigned int length);
 
 
-void aprof_write(void *memory_addr, unsigned int length);
+void _aprof_write(void *memory_addr, unsigned int length);
 
 
 void aprof_collect(); //cost collection to be finished
@@ -55,4 +55,6 @@ void aprof_collect(); //cost collection to be finished
 unsigned long aprof_get_cost();
 
 
-void aprof_increment_cost();
+void _aprof_increment_cost();
+
+void update_call_cost();

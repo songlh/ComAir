@@ -1,22 +1,39 @@
-#include "AProfHooks.h"
-
 #include <stdio.h>
 
+int test_for() {
+    int a;
 
-int main () {
+    /* for loop execution */
+    for (a = 1; a < 10; a++) {
+        printf("value of a: %d\n", a);
+    }
 
-    aprof_init();
+    /* local variable definition */
+    a = 100;
+
+    /* check the boolean condition */
+    if (a < 20) {
+        /* if condition is true then print the following */
+        printf("a is less than 20\n");
+    } else {
+        /* if condition is false then print the following */
+        printf("a is not less than 20\n");
+    }
+
+    return 0;
+}
+
+int main() {
 
     int a;
 
     /* for loop execution */
-    for( a = 10; a < 20; a = a + 1 ){
-        aprof_write(&a, sizeof(a));
-//        printf("numbers = %p\n",(&a));
-//        printf("numbers = %p\n",(&a) + 1);
-//        printf("value of a: %d\n", a);
+    for (a = 1; a < 10; a++) {
+        printf("value of a: %d\n", a);
     }
 
+    a = test_for();
+    printf("value of a: %d\n", a);
 
     return 0;
 }

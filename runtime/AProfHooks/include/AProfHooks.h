@@ -4,6 +4,14 @@
 #include "common.h"
 #include "hashMap.h"
 #include "inputPro.h"
+#include "logger.h"
+
+
+char *FILENAME = "aprof_logger.txt";
+int LEVEL = 0;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+int QUIET = 1;
+
+void logger_init();
 
 int aprof_init();
 

@@ -1,5 +1,6 @@
 #include "common.h"
 #include "hashMap.h"
+#include "logger.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -14,11 +15,10 @@ int createHashMap() {
             SLOTLENGTH, sizeof(struct _hashMapElem *));
 
     if (!hMap || !hMap->elements) {
-        printf("Error in createHashMap(), momory allocation not success\n");
+        log_error("Error in createHashMap(), memory allocation not success.");
         return STATUS_ERROR;
 
     } else {
-
         hMap->size = 0;
         hMap->totalElem = 0;
         return STATUS_SUCCESS;
@@ -29,8 +29,7 @@ void destroyHashMap() {
 
     HashMap *hm = hMap;
     if (hm == NULL) {
-        printf("destroyHashMap(): cannot destroy hMap, it is NULL.\n");
-
+        log_error("destroyHashMap(): cannot destroy hMap, it is NULL.");
     }
 
     free(hm->elements);
@@ -45,7 +44,7 @@ unsigned int keyToIndex(char *key) {  // return -1 means error
 
     if (key == NULL) {
 
-        printf("Error in keyToIndex(), empty key.\n");
+        log_error("Error in keyToIndex(), empty key.");
         return -1;
 
     }
@@ -68,12 +67,12 @@ int hashMapRemove(char *key) {
     string_addr = key;
 
     if (hMap == NULL) {
-        printf("Error in HashMapRemove(), empty hMap.\n");
+        log_error("Error in HashMapRemove(), empty hMap.");
         return STATUS_NULL;
     }
 
     if (key == NULL) {
-        printf("Error in HashMapRemove(), empty key.\n");
+        log_error("Error in HashMapRemove(), empty key.");
         return STATUS_NULL;
     }
 
@@ -81,7 +80,7 @@ int hashMapRemove(char *key) {
     //printf("-----------------entering HashMapRemove(), key is %s, value is %d, index is %u.\n", key, value, index);
 
     if (index == -1) {
-        printf("Error in HashMapRemove(), keyToIndex error.\n");
+        log_error("Error in HashMapRemove(), keyToIndex error.");
         return STATUS_NULL;
     }
 
@@ -91,7 +90,7 @@ int hashMapRemove(char *key) {
         if (!strcmp(p->key, key)) { // slot element is the to be removed one.
 
             hMap->elements[index] = p->next;
-            //printf("slot element remove with key:%s\n",p->key);
+            log_debug("slot element remove with key:%s ", p->key);
             free(p->key);
             free(p);
 
@@ -99,7 +98,7 @@ int hashMapRemove(char *key) {
                 hMap->size--;// if hMap->elements[index] is empty, size--
             }
             hMap->totalElem--;
-            //printf("---------successfully remove the element.\n ");
+            log_debug("---------successfully remove the element.");
             return STATUS_SUCCESS;
         }
 
@@ -107,23 +106,23 @@ int hashMapRemove(char *key) {
 
             if (!strcmp(p->next->key, key)) { // list element is the to be removed one.
                 q = p->next; // q needs to be removed
-                //printf("list element remove with key:%s\n",q->key);
+                log_debug("list element remove with key:%s ",q->key);
                 p->next = q->next; // ******needs to be very careful
                 free(q->key);
                 free(q);
                 hMap->totalElem--;
-                //printf("---------successfully remove the element.\n");
+                log_debug("---------successfully remove the element.");
                 return STATUS_SUCCESS;
             }
             p = p->next;
         }
 
-        printf("element with key does not in the list\n");
+        log_debug("element with key does not in the list.");
         return STATUS_SUCCESS;
 
     } else {
 
-        printf("element does not exist, slot empty\n");
+        log_debug("element does not exist, slot empty.");
         return STATUS_SUCCESS;
     }
 }
@@ -137,35 +136,33 @@ int hashMapRemove(char *key) {
 int hashMapPut(char *key, unsigned long value) {
     struct _hashMapElem *p, *q;
     char *start_addr = key;
-    int oldvalue;
+    long old_value;
     unsigned int index;
 
     if (hMap == NULL) {
-        printf("Error in HashMapPut(), empty hMap.\n");
-        return -1;
+        log_error("Error in HashMapPut(), empty hMap.");
+        return STATUS_NULL;
     }
 
     if (key == NULL) {
-        printf("Error in HashMapPut(), empty key.\n");
-        return -1;
+        log_error("Error in HashMapPut(), empty key.");
+        return STATUS_NULL;
     }
 
     index = keyToIndex(start_addr);
-    //printf("-----------------entering HashMapPut(), key is %s, value is %d, index is %u.\n", key, value, index);
+    log_debug("-----------------entering HashMapPut(), key is %s, value is %d, index is %u.", key, value, index);
 
     if (index == -1) {
-        printf("Error in HashMapPut(), keyToIndex error.\n");
+        printf("Error in HashMapPut(), keyToIndex error.");
         return -1;
     }
 
     if (hMap->elements[index] == NULL) { // the index slot is empty, put the first element
-        //printf("elements[%u] position is NULL. \n",index);
-
+        log_debug("elements[%u] position is NULL.",index);
         p = (struct _hashMapElem *) malloc(sizeof(struct _hashMapElem));
         if (p == NULL) {
-
-            printf("Error in HashMapPut() 1, HashMapelem allocation error.\n");
-            return -1;
+            log_error("Error in HashMapPut() 1, HashMapElem allocation error.");
+            return STATUS_NULL;
         }
 
         p->key = key;
@@ -175,7 +172,8 @@ int hashMapPut(char *key, unsigned long value) {
         hMap->size++;
         hMap->totalElem++;
 
-//        printf("successfully added one element to elements[%d], key is %s, value is %d.\n", index, hMap->elements[index]->key,hMap->elements[index]->value);
+        log_debug("successfully added one element to elements[%d], key is %s, value is %d.",
+                  index, hMap->elements[index]->key,hMap->elements[index]->value);
         return MAP_SUCCESS;
 
     } else { // the index slot is not empty
@@ -184,34 +182,32 @@ int hashMapPut(char *key, unsigned long value) {
 
         if (!strcmp(q->key, key)) {
             // the put element is the first elem
-//            printf("the put element is the first element of elements[%u]\n",index);
-            oldvalue = q->value;
+            log_debug("the put element is the first element of elements[%u]", index);
+            old_value = q->value;
             q->value = value;
-            return oldvalue;
+            return old_value;
 
         } else {
 
             while (q->next != NULL) { // search in the list of elements[index]
 
                 if (!strcmp(q->next->key, key)) {
-
-//                    printf("the put element is in the list of elements[%u]\n",index);
-                    oldvalue = q->next->value;
+                    log_debug("the put element is in the list of elements[%u]",index);
+                    old_value = q->next->value;
                     q->next->value = value;
-                    return oldvalue;
+                    return old_value;
                 }
 
                 q = q->next;
             }
 
-            //printf("the put element is not in the list of elements[%u]\n",index);
+            log_debug("the put element is not in the list of elements[%u]",index);
             //the put element is not in the list. put the new element at the first position
             p = (struct _hashMapElem *) malloc(sizeof(struct _hashMapElem));
 
             if (p == NULL) {
-
-//                printf("Error in HashMapPut() 2, HashMapelem allocation error.\n");
-                return -1;
+                log_error("Error in HashMapPut() 2, HashMapElem allocation error.");
+                return STATUS_NULL;
             }
 
             p->key = key;
@@ -221,7 +217,8 @@ int hashMapPut(char *key, unsigned long value) {
             p->next = hMap->elements[index];
             hMap->elements[index] = p;
             hMap->totalElem++;
-//            printf("successfully added one element to the list of elements[%d], key is %s, value is %d.\n", index, hMap->elements[index]->key,hMap->elements[index]->value);
+            log_debug("successfully added one element to the list of elements[%d], key is %s, value is %d.",
+                      index, hMap->elements[index]->key,hMap->elements[index]->value);
             return MAP_SUCCESS;
 
         }
@@ -240,15 +237,15 @@ int hashMapGet(char *key) {
 
     if (hMap == NULL) {
 
-        printf("Error in HashMapGet(), empty hMap.\n");
-        return -1;
+        log_error("Error in HashMapGet(), empty hMap.");
+        return STATUS_NULL;
 
     }
 
     if (key == NULL) {
 
-        printf("Error in HashMapGet(), empty key");
-        return MAP_MISS;
+        log_error("Error in HashMapGet(), empty key");
+        return STATUS_NULL;
     }
 
     index = keyToIndex(key);
@@ -265,26 +262,26 @@ int hashMapGet(char *key) {
         }*/
 
         if (!strcmp(p->key, key)) {// the slot element's key matches.
-            //printf(" slot element match.\n\n");
+            log_debug(" slot element match.");
             return p->value;
         }
 
         while (p->next != NULL) {
 
             if (!strcmp(p->next->key, key)) { // the key is in the list of hMap->elements[index]
-                //printf("list element matches.\n\n");
+                log_debug("list element matches.");
                 return p->next->value;
             }
 
             p = p->next;
         }
 
-        //printf("HashMapGet() return, does not find\n");
+        log_error("HashMapGet() return, does not find.");
         return MAP_MISS;
 
     } else {
-        //printf("keyToIndex() is -1, wrong HashMapGet() return\n");
 
+        log_error("keyToIndex() is -1, wrong HashMapGet() return.");
         return MAP_MISS;
     }
 }
@@ -293,8 +290,9 @@ unsigned long int stringToInt(char *str) {
 
     unsigned long int intaddr;
     if (str == NULL) {
-        printf("Error in stringToInt(), empty str\n");
-        return -1;
+        log_error("Error in stringToInt(), empty str.");
+        return STATUS_ERROR;
+
     } else {
         intaddr = strtol(str, NULL, 16);
         return intaddr;
@@ -305,8 +303,8 @@ unsigned long currentSlotSize() {
     HashMap *ph = hMap;
     if (ph == NULL) {
 
-        printf("Error in currentSlotSize(), empty hMap\n");
-        return -1;
+        log_error("Error in currentSlotSize(), empty hMap.");
+        return STATUS_ERROR;
 
     } else {
 
@@ -321,8 +319,8 @@ unsigned long currentElemSize() {
 
     if (ph == NULL) {
 
-        printf("Error in currentElemSize(), empty hMap\n");
-        return -1;
+        log_error("Error in currentElemSize(), empty hMap.");
+        return STATUS_ERROR;
 
     } else {
 

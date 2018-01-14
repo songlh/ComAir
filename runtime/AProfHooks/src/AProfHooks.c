@@ -3,20 +3,29 @@
 #include "AProfHooks.h"
 
 
+void logger_init() {
+    FILE *fp = fopen(FILENAME, "w");
+    log_set_level(LEVEL);
+    log_set_fp(fp);
+    log_set_quiet(QUIET);
+}
+
 int aprof_init() {
+
+    logger_init();
 
     int r = createHashMap();
     if (r == 0) {
-        printf("create hashMap error!");
+        log_error("create hashMap error!");
         return STATUS_ERROR;
     }
 
     r = createShadowStack();
     if (r == 0) {
-        printf("create shadow stack error!");
+        log_error("create shadow stack error!");
         return STATUS_ERROR;
     }
-
+    log_debug("aprof init success!");
     return STATUS_SUCCESS;
 
 }

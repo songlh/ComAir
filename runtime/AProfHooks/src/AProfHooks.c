@@ -41,6 +41,9 @@ void aprof_call_after() {
     update_call_cost();
 }
 
+void aprof_return() {
+    _aprof_return();
+}
 
 void PrintExecutionCost(long cost) {
     printf("TOTAL COST: %ld\n", cost);

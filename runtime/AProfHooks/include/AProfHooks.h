@@ -17,4 +17,6 @@ void aprof_call_before(char *FuncName);
 
 void aprof_call_after();
 
+void aprof_return();
+
 #endif //COMAIR_APROFHOOK_H

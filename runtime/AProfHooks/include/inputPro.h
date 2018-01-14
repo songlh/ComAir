@@ -40,7 +40,7 @@ int expandStack();
 void aprof_call(char *funcName);
 
 
-void aprof_return();
+void _aprof_return();
 
 
 void _aprof_read(void *memory_addr, unsigned int length);

@@ -110,6 +110,14 @@ void AprofHook::SetupFunctions() {
     this->aprof_call_after = Function::Create
             (AprofCallAfterType, GlobalValue::ExternalLinkage, "aprof_call_after", this->pModule);
     this->aprof_call_after->setCallingConv(CallingConv::C);
+    ArgTypes.clear();
+
+    // aprof_return
+    FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
+    this->aprof_return = Function::Create
+            (AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return", this->pModule);
+    this->aprof_return->setCallingConv(CallingConv::C);
+    ArgTypes.clear();
 
 }
 
@@ -230,6 +238,14 @@ void AprofHook::InsertAprofCallAfter(Instruction *AfterCallInst) {
 
 }
 
+void AprofHook::InsertAprofReturn(Instruction *BeforeInst) {
+    CallInst *void_49 = CallInst::Create(this->aprof_return, "", BeforeInst);
+    void_49->setCallingConv(CallingConv::C);
+    void_49->setTailCall(false);
+    AttributeList void_PAL;
+    void_49->setAttributes(void_PAL);
+}
+
 void AprofHook::SetupInit() {
     // all set up operation
     SetupTypes();
@@ -332,6 +348,12 @@ void AprofHook::SetupHooks() {
                             InsertAprofRead(secondOp, Inst);
                         }
 
+                        break;
+                    }
+
+                    case Instruction::Ret: {
+                        // FIXME:: If the function is main, it means Stack empty ?
+                        InsertAprofReturn(Inst);
                         break;
                     }
                 }

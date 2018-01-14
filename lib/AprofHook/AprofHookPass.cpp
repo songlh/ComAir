@@ -3,8 +3,10 @@
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/Support/raw_ostream.h"
 
 
 using namespace llvm;
@@ -16,9 +18,56 @@ static RegisterPass<AprofHook> X(
         "profiling algorithmic complexity",
         true, true);
 
+/* */
+
+int GetFunctionID(Function *F) {
+
+    if (F->begin() == F->end()) {
+        return -1;
+    }
+
+    Instruction *I = &*(F->begin()->begin());
+
+    MDNode *Node = I->getMetadata("func_id");
+    if (!Node) {
+        return -1;
+    }
+
+    assert(Node->getNumOperands() == 1);
+    const Metadata *MD = Node->getOperand(0);
+    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
+        Value *V = MDV->getValue();
+        ConstantInt *CI = dyn_cast<ConstantInt>(V);
+        assert(CI);
+        return CI->getZExtValue();
+    }
+
+    return -1;
+}
+
+
+int GetInstructionID(Instruction *II) {
+
+    MDNode *Node = II->getMetadata("ins_id");
+    if (!Node) {
+        return -1;
+    }
+
+    assert(Node->getNumOperands() == 1);
+    const Metadata *MD = Node->getOperand(0);
+    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
+        Value *V = MDV->getValue();
+        ConstantInt *CI = dyn_cast<ConstantInt>(V);
+        assert(CI);
+        return CI->getZExtValue();
+    }
+
+    return -1;
+}
+
+/* */
 
 char AprofHook::ID = 0;
-
 
 void AprofHook::getAnalysisUsage(AnalysisUsage &AU) const {}
 
@@ -97,19 +146,12 @@ void AprofHook::SetupFunctions() {
     ArgTypes.clear();
 
     // aprof_call_before
-    PointerType *CharPointer = PointerType::get(
-            IntegerType::get(pModule->getContext(), 8), 0);
-    FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType, CharPointer, false);
+
+    FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType,
+                                                          this->IntType, false);
     this->aprof_call_before = Function::Create
             (AprofCallBeforeType, GlobalValue::ExternalLinkage, "aprof_call_before", this->pModule);
     this->aprof_call_before->setCallingConv(CallingConv::C);
-    ArgTypes.clear();
-
-    // aprof_call_after
-    FunctionType *AprofCallAfterType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_call_after = Function::Create
-            (AprofCallAfterType, GlobalValue::ExternalLinkage, "aprof_call_after", this->pModule);
-    this->aprof_call_after->setCallingConv(CallingConv::C);
     ArgTypes.clear();
 
     // aprof_return
@@ -193,35 +235,14 @@ void AprofHook::InsertAprofRead(Value *var, Instruction *BeforeInst) {
 }
 
 
-void AprofHook::InsertAprofCallBefore(std::string FuncName, Instruction *BeforeCallInst) {
+void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
 
-    Constant *const_string_funName = ConstantDataArray::getString(
-            this->pModule->getContext(), FuncName, true);
-
-    ArrayType *ArrayTy_FuncName = ArrayType::get(IntegerType::get(
-            this->pModule->getContext(), 8), FuncName.size() + 1);
-
-    GlobalVariable *gvar_array = new GlobalVariable(
-            /*Module=*/*(this->pModule),
-            /*Type=*/ArrayTy_FuncName,
-            /*isConstant=*/true,
-            /*Linkage=*/GlobalValue::PrivateLinkage,
-            /*Initializer=*/0, // has initializer, specified below
-            /*Name=*/FuncName);
-    gvar_array->setAlignment(1);
-    gvar_array->setInitializer(const_string_funName);
-
-    ConstantInt *const_int32_26 = ConstantInt::get(
-            this->pModule->getContext(), APInt(32, StringRef("0"), 10));
-
-    std::vector<Constant *> const_ptr_30_indices;
-    const_ptr_30_indices.push_back(const_int32_26);
-    const_ptr_30_indices.push_back(const_int32_26);
-    Constant *const_ptr_30 = ConstantExpr::getGetElementPtr(
-            ArrayTy_FuncName, gvar_array, const_ptr_30_indices);
+    ConstantInt *const_int6 = ConstantInt::get(
+            this->pModule->getContext(),
+            APInt(32, StringRef(std::to_string(FuncID)), 10));
 
     CallInst *void_46 = CallInst::Create(
-            this->aprof_call_before, const_ptr_30, "", BeforeCallInst);
+            this->aprof_call_before, const_int6, "", BeforeCallInst);
     void_46->setCallingConv(CallingConv::C);
     void_46->setTailCall(false);
     AttributeList void_PAL;
@@ -229,14 +250,6 @@ void AprofHook::InsertAprofCallBefore(std::string FuncName, Instruction *BeforeC
 
 }
 
-void AprofHook::InsertAprofCallAfter(Instruction *AfterCallInst) {
-    CallInst *void_49 = CallInst::Create(this->aprof_call_after, "", AfterCallInst);
-    void_49->setCallingConv(CallingConv::C);
-    void_49->setTailCall(false);
-    AttributeList void_PAL;
-    void_49->setAttributes(void_PAL);
-
-}
 
 void AprofHook::InsertAprofReturn(Instruction *BeforeInst) {
     CallInst *void_49 = CallInst::Create(this->aprof_return, "", BeforeInst);
@@ -260,42 +273,31 @@ void AprofHook::SetupHooks() {
     // init all global and constants variables
     SetupInit();
 
-    Function *MainFunc = this->pModule->getFunction("main");
-    if (MainFunc) {
-
-        Instruction *firstInst = &*(MainFunc->begin()->begin());
-        InsertAprofInit(firstInst);
-        InsertAprofCallBefore("main", firstInst);
-
-        for (Function::iterator BI = MainFunc->begin(); BI != MainFunc->end(); BI++) {
-
-            BasicBlock *BB = &*BI;
-
-            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
-
-                Instruction *Inst = &*II;
-
-                if (Inst->getOpcode() == Instruction::Ret) {
-
-                    // update main function cost
-                    InsertAprofCallAfter(Inst);
-                }
-            }
-        }
-    }
-
     for (Module::iterator FI = this->pModule->begin();
          FI != this->pModule->end(); FI++) {
 
         Function *Func = &*FI;
 
+        int FuncID = GetFunctionID(Func);
+
+        if (FuncID > 0) {
+            errs() << FuncID << ":" << Func->getName() << "\n";
+            Instruction *firstInst = &*(Func->begin()->begin());
+            InsertAprofCallBefore(FuncID, firstInst);
+        }
+
         for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
             BasicBlock *BB = &*BI;
-            Instruction *firstInst = &*(BB->begin());
-            if (firstInst) {
-                InsertAprofIncrementCost(firstInst);
+            auto BB_it = BB->begin();
+            Instruction *firstInst = &*(BB_it);
+            int Inst_ID = GetInstructionID(firstInst);
+            while (firstInst->getOpcode() == Instruction::PHI || Inst_ID == -1) {
+                BB_it++;
+                firstInst = &*(BB_it);
+                Inst_ID = GetInstructionID(firstInst);
             }
+            InsertAprofIncrementCost(firstInst);
 
             for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
 
@@ -318,22 +320,6 @@ void AprofHook::SetupHooks() {
                         break;
                     }
 
-                    case Instruction::Call: {
-                        CallSite cs(Inst);
-                        Function *Callee = dyn_cast<Function>(cs.getCalledValue()->stripPointerCasts());
-
-                        if (Callee) {
-                            if (Callee->begin() != Callee->end()) {
-                                InsertAprofCallBefore(Callee->getName(), Inst);
-                                II++;
-                                Instruction *AfterCallInst = &*II;
-                                InsertAprofCallAfter(AfterCallInst);
-                                II--;
-                            }
-                        }
-                        break;
-                    }
-
                     case Instruction::Load: {
                         // load instruction only has one operand !!!
                         Value *secondOp = Inst->getOperand(0);
@@ -343,22 +329,27 @@ void AprofHook::SetupHooks() {
                             secondOpType = secondOpType->getContainedType(0);
                         }
 
-                        // FIXME::ignore function pointer store!
-                        if (!isa<FunctionType>(secondOpType)) {
-                            InsertAprofRead(secondOp, Inst);
-                        }
+                        InsertAprofRead(secondOp, Inst);
 
                         break;
                     }
 
                     case Instruction::Ret: {
-                        // FIXME:: If the function is main, it means Stack empty ?
+
                         InsertAprofReturn(Inst);
+
                         break;
                     }
                 }
             }
         }
+    }
+
+    Function *MainFunc = this->pModule->getFunction("main");
+    if (MainFunc) {
+
+        Instruction *firstInst = &*(MainFunc->begin()->begin());
+        InsertAprofInit(firstInst);
     }
 }
 

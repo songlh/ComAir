@@ -59,7 +59,7 @@ int expandStack() {
 
         printf("expand stack(): memory allocation not success\n");
 
-        return -1;
+        return STATUS_NULL;
 
     } else {
 
@@ -72,7 +72,7 @@ int expandStack() {
         psStack->StackElements = new_elements;
         psStack->size = new_stack_size;
 
-        return 0;
+        return STATUS_SUCCESS;
     }
 
 }
@@ -113,35 +113,36 @@ int emptyStack() {
 }
 
 
-int pushStackElem(char *funcName, unsigned long count) {
+int pushStackElem(char *funcName) {
+
     int expand;
 
     if (psStack == NULL || funcName == NULL) {
 
-        printf("createStackNode(): stack pointer or function name is NULL. \n");
-        return -1;
-
+        printf("create Stack Node(): stack pointer or function name is NULL. \n");
+        return STATUS_NULL;
     }
 
     if (psStack->top + 1 >= psStack->size) { // need to expand stack size;
 
         expand = expandStack();
+        if (expand != STATUS_SUCCESS) {
 
-        if (expand != 0) {
-
-            printf("pushstackelem(): expandstack() not succeed\n");
-            return -1;
-
+            printf("push stack elem(): expand stack() not succeed. \n");
+            return STATUS_ERROR;
         }
     }
-
+    printf("pushStackElem() current funcName: %s \n", funcName);
     (psStack->StackElements[psStack->top]).funcname = funcName;
-    (psStack->StackElements[psStack->top]).ts = count;//count;
+    // count is global count
+    (psStack->StackElements[psStack->top]).ts = count;
     (psStack->StackElements[psStack->top]).rms = 0;
-    (psStack->StackElements[psStack->top]).cost = aprof_get_cost(); // get_cost() function;
+    // init is current bb_count, it should update after call funcName!!!
+    printf("pushStackElem() current bb_count: %ld \n", bb_count);
+    (psStack->StackElements[psStack->top]).cost = bb_count;
     psStack->elementsNum++;
     psStack->top++;
-    return 0;
+    return STATUS_SUCCESS;
 
 }
 
@@ -179,13 +180,12 @@ unsigned long aprof_get_cost() {
 void aprof_call(char *funcName) {
 
     count++;
-    int push_result;
-
-    push_result = pushStackElem(funcName, count);
-    if (push_result != 0) {
-        printf("call(): push stack error.\n");
+    int push_result = pushStackElem(funcName);
+    if (push_result != STATUS_SUCCESS) {
+        printf("execution call(): push stack error.\n");
         exit(0);
     }
+    printf("call(), current stack size: %ld \n", psStack->top);
 }
 
 
@@ -270,7 +270,7 @@ void aprof_read(unsigned long startAddr, unsigned int length) {
 
 }
 
-void aprof_write(void *memory_addr, unsigned int length) {
+void _aprof_write(void *memory_addr, unsigned int length) {
 
     unsigned long i;
     unsigned int j;
@@ -300,6 +300,17 @@ void aprof_write(void *memory_addr, unsigned int length) {
 }
 
 
-void aprof_increment_cost() {
+void _aprof_increment_cost() {
     bb_count++;
+}
+
+
+void update_call_cost() {
+    if (psStack->top > 0) {
+        psStack->StackElements[psStack->top - 1].cost =
+                bb_count - psStack->StackElements[psStack->top - 1].cost;
+        printf("update_call_cost(), current top: %ld \n", psStack->top);
+        printf("stack top funcName(): %s \n", psStack->StackElements[psStack->top - 1].funcname);
+        printf("update_call_cost(): %ld \n", psStack->StackElements[psStack->top - 1].cost);
+    }
 }

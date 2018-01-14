@@ -150,15 +150,16 @@ int hashMapPut(char *key, unsigned long value) {
     }
 
     index = keyToIndex(start_addr);
-    log_debug("-----------------entering HashMapPut(), key is %s, value is %d, index is %u.", key, value, index);
+    log_trace("HashMapPut(), key is %s, value is %d, index is %u.",
+              key, value, index);
 
     if (index == -1) {
-        printf("Error in HashMapPut(), keyToIndex error.");
+        log_error("Error in HashMapPut(), keyToIndex error.");
         return -1;
     }
 
     if (hMap->elements[index] == NULL) { // the index slot is empty, put the first element
-        log_debug("elements[%u] position is NULL.",index);
+        log_trace("elements[%u] position is NULL.",index);
         p = (struct _hashMapElem *) malloc(sizeof(struct _hashMapElem));
         if (p == NULL) {
             log_error("Error in HashMapPut() 1, HashMapElem allocation error.");
@@ -166,14 +167,16 @@ int hashMapPut(char *key, unsigned long value) {
         }
 
         p->key = key;
+//        strcpy(p->key, key);
+        log_debug("hashMapPut() put key is %s", p->key);
         p->next = NULL;
         p->value = value;
         hMap->elements[index] = p;
         hMap->size++;
         hMap->totalElem++;
 
-        log_debug("successfully added one element to elements[%d], key is %s, value is %d.",
-                  index, hMap->elements[index]->key,hMap->elements[index]->value);
+        log_trace("successfully added one element to elements[%d], key is %s, value is %d.",
+                  index, hMap->elements[index]->key, hMap->elements[index]->value);
         return MAP_SUCCESS;
 
     } else { // the index slot is not empty
@@ -182,7 +185,7 @@ int hashMapPut(char *key, unsigned long value) {
 
         if (!strcmp(q->key, key)) {
             // the put element is the first elem
-            log_debug("the put element is the first element of elements[%u]", index);
+            log_trace("the put element is the first element of elements[%u]", index);
             old_value = q->value;
             q->value = value;
             return old_value;
@@ -192,7 +195,7 @@ int hashMapPut(char *key, unsigned long value) {
             while (q->next != NULL) { // search in the list of elements[index]
 
                 if (!strcmp(q->next->key, key)) {
-                    log_debug("the put element is in the list of elements[%u]",index);
+                    log_trace("the put element is in the list of elements[%u]",index);
                     old_value = q->next->value;
                     q->next->value = value;
                     return old_value;
@@ -201,7 +204,7 @@ int hashMapPut(char *key, unsigned long value) {
                 q = q->next;
             }
 
-            log_debug("the put element is not in the list of elements[%u]",index);
+            log_trace("the put element is not in the list of elements[%u]",index);
             //the put element is not in the list. put the new element at the first position
             p = (struct _hashMapElem *) malloc(sizeof(struct _hashMapElem));
 
@@ -211,13 +214,14 @@ int hashMapPut(char *key, unsigned long value) {
             }
 
             p->key = key;
+//            strcpy(p->key, key);
             p->value = value;
             p->next = NULL;
             // ***here needs to be very careful. insert the put node as the first node
             p->next = hMap->elements[index];
             hMap->elements[index] = p;
             hMap->totalElem++;
-            log_debug("successfully added one element to the list of elements[%d], key is %s, value is %d.",
+            log_trace("successfully added one element to the list of elements[%d], key is %s, value is %d.",
                       index, hMap->elements[index]->key,hMap->elements[index]->value);
             return MAP_SUCCESS;
 
@@ -253,14 +257,8 @@ int hashMapGet(char *key) {
     if (index != -1) {
 
         p = hMap->elements[index];
-        q = p;
-        //printf("find index:%u, hMap->elements[%u] has key:%s\n", index, index, p->key);
-        //printf("printing list elements on this index:\n");
-        /*while (q!=NULL){
-            printf("             key:%s, value:%d \n", q->key, q->value);
-            q = q->next;
-        }*/
 
+        log_debug("p->key is %s, current key is %s", p->key, key);
         if (!strcmp(p->key, key)) {// the slot element's key matches.
             log_debug(" slot element match.");
             return p->value;

@@ -131,13 +131,14 @@ int pushStackElem(char *funcName) {
             return STATUS_ERROR;
         }
     }
-    log_debug("pushStackElem() current funcName: %s.", funcName);
+    log_trace("pushStackElem() current funcName: %s.", funcName);
     (psStack->StackElements[psStack->top]).funcname = funcName;
     // count is global count
+    log_trace("pushStackElem() current count: %d.", count);
     (psStack->StackElements[psStack->top]).ts = count;
     (psStack->StackElements[psStack->top]).rms = 0;
     // init is current bb_count, it should update after call funcName!!!
-    log_debug("pushStackElem() current bb_count: %ld", bb_count);
+    log_trace("pushStackElem() current bb_count: %ld", bb_count);
     (psStack->StackElements[psStack->top]).cost = bb_count;
     psStack->elementsNum++;
     psStack->top++;
@@ -184,20 +185,23 @@ void aprof_call(char *funcName) {
         log_error("execution call(): push stack error.");
         exit(0);
     }
-    log_debug("aprof_call(), current stack size: %ld ", psStack->top);
+    log_debug("aprof_call(), FuncName is %s, current stack size: %ld ",
+              funcName, psStack->top);
 }
 
 
-void aprof_collect() {
-    // TODO: read paper and finish it
+void _aprof_collect() {
 
     if (psStack == NULL) {
 
         log_error("aprof_collect(): stack pointer is NULL.");
     }
 
-    log_debug("aprof_collect(): collecting data functions needs to be finished.");
-    // TODO: maybe here we should log to file some information!!!
+    unsigned long stack_top = psStack->top - 1;
+    log_fatal("Function Name %s; RMS %ld; Cost %ld",
+              psStack->StackElements[stack_top].funcname,
+              psStack->StackElements[stack_top].rms,
+              psStack->StackElements[stack_top].cost);
 }
 
 
@@ -209,7 +213,7 @@ void _aprof_return() {
         return;
     }
 
-    aprof_collect();
+    _aprof_collect();
 
     if (psStack->top > 1) {
         unsigned long stack_top = psStack->top - 1;
@@ -237,11 +241,15 @@ void _aprof_read(void *memory_addr, unsigned int length) {
         // hash_map_result records the ts[string_addr]
         int hash_map_result = hashMapGet(string_addr);
 
+        log_trace("aprof_read ts[%s], and the value is %d",
+                  string_addr, hash_map_result);
+
         // stack_top should be the top of the stack
         stack_top = psStack->top - 1;
 
         //stack_result records the S[top].ts
         unsigned long stack_result = psStack->StackElements[stack_top].ts;
+        log_trace("aprof_read S[top].ts is %d", stack_result);
 
         // ts[string_addr] < S[top].ts
         if (hash_map_result < stack_result) {
@@ -321,10 +329,17 @@ void _aprof_increment_cost() {
 
 void update_call_cost() {
     if (psStack->top > 0) {
-        psStack->StackElements[psStack->top - 1].cost =
-                bb_count - psStack->StackElements[psStack->top - 1].cost;
-        log_debug("update_call_cost(), current top: %ld ", psStack->top);
-        log_debug("stack top funcName(): %s ", psStack->StackElements[psStack->top - 1].funcname);
-        log_debug("update_call_cost(): %ld ", psStack->StackElements[psStack->top - 1].cost);
+        unsigned long stack_top = psStack->top - 1;
+
+        if(stack_top == 0) {
+            psStack->StackElements[stack_top].cost = bb_count;
+        } else{
+            psStack->StackElements[stack_top].cost =
+                    bb_count - psStack->StackElements[stack_top].cost;
+        }
+
+        log_trace("update_call_cost(), current top: %ld ", psStack->top);
+        log_trace("stack top funcName(): %s ", psStack->StackElements[stack_top].funcname);
+        log_trace("update_call_cost(): %ld ", psStack->StackElements[stack_top].cost);
     }
 }

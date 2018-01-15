@@ -4,9 +4,9 @@
 
 typedef struct _ShadowStackElem {
     int  funcId; // function id
-    long ts; // time stamp
-    long rms;
-    long cost;
+    unsigned long ts; // time stamp
+    unsigned long rms;
+    unsigned long cost;
 } ShadowStackElement;
 
 

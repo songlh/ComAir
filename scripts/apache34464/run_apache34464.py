@@ -15,7 +15,7 @@ PATH = os.path.dirname(os.path.realpath(__file__))
 
 
 def generate_input():
-    for i in range(0, 5000):
+    for i in range(0, 500):
         file_name = CASE_NAME.format(i)
         with open(file_name, 'w') as f:
             context = ('a' * i) + CONSTANT_SONG
@@ -25,7 +25,7 @@ def generate_input():
 
 
 def run_command():
-    for i in range(0, 5000):
+    for i in range(0, 500):
         if os.path.exists(APROF_LOGGER):
             new_name = APROF_LOGGER.split('.')[0] + '_' + str(i - 1) + '.txt'
             os.rename(APROF_LOGGER, new_name)
@@ -94,9 +94,9 @@ def statistics():
 
 
 if __name__ == '__main__':
-    # clean_txt()
-    # generate_input()
-    # run_command()
-    # parse_log_file()
-    # clean_txt()
+    clean_txt()
+    generate_input()
+    run_command()
+    parse_log_file()
+    clean_txt()
     statistics()

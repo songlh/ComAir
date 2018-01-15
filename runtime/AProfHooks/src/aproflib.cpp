@@ -6,9 +6,6 @@
 
 using namespace std;
 
-const char *FILENAME = "aprof_logger.txt";
-int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
-int QUIET = 1;
 unsigned long count = 0;
 unsigned long bb_count = 0;
 std::stack<ShadowStackElement *> shadow_stack;
@@ -16,6 +13,9 @@ std::map<unsigned long, unsigned long> ts_map;
 
 
 void logger_init() {
+    const char *FILENAME = "aprof_logger.txt";
+    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_set_level(LEVEL);
     log_set_fp(fp);
@@ -28,25 +28,27 @@ int aprof_init() {
 
 void aprof_write(void *memory_addr, unsigned int length) {
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned int j = length;
+    unsigned long j = start_addr + length;
 
-    for (unsigned long i = start_addr; j > 0; j--) {
+    for (unsigned long i = start_addr; i < j; i++) {
         ts_map[i] = count;
-        log_trace("aprof_write: memory_adrr is %ld, value is %ld", i, count);
-        i++;
     }
+
+    log_trace("aprof_write: memory_adrr is %ld, lenght is %ld, value is %ld",
+              start_addr, length, count);
+
 }
 
 void aprof_read(void *memory_addr, unsigned int length) {
+    unsigned long i;
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned int j = length;
     ShadowStackElement *topEle = shadow_stack.top();
-    log_trace("aprof_read: length %d", length);
 
-    for (unsigned long i = start_addr; j > 0; j--) {
+    for (i = start_addr; i < (start_addr + length); i++) {
 
         if (ts_map.find(i) != ts_map.end()) {
 
+            // ts[w] > 0 and ts[w] < S[top]
             if (ts_map[i] < topEle->ts) {
 
                 topEle->rms++;
@@ -57,10 +59,8 @@ void aprof_read(void *memory_addr, unsigned int length) {
                 while (!shadow_stack.empty()) {
 
                     topEle = shadow_stack.top();
-
                     if (topEle->ts <= ts_map[i]) {
-                        log_trace("aprof_read: (ts[i])%ld >= (S[top].ts) %ld",
-                                  ts_map[i], topEle->ts);
+
                         topEle->rms--;
                         break;
 
@@ -68,7 +68,6 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
                         tempStack.push(topEle);
                         shadow_stack.pop();
-                        topEle = shadow_stack.top();
                     }
                 }
 
@@ -77,20 +76,21 @@ void aprof_read(void *memory_addr, unsigned int length) {
                     tempStack.pop();
                 }
             }
+
         } else {
 
+            // w is not in map
             topEle->rms++;
-            log_trace("aprof_read: i %ld is not in ts map", i);
         }
 
         ts_map[i] = count;
-        log_trace("aprof_read: memory_adrr is %ld, value is %ld", i, count);
-        i++;
     }
+
 }
 
 void aprof_increment_cost() {
     bb_count++;
+
 }
 
 void aprof_call_before(int funcId) {
@@ -111,14 +111,7 @@ void aprof_call_before(int funcId) {
 void aprof_call_after() {
 
     ShadowStackElement *topElement = shadow_stack.top();
-
-    if (shadow_stack.size() == 1) {
-        topElement->cost = bb_count;
-
-    } else {
-        topElement->cost = bb_count - topElement->cost;
-    }
-    log_trace("aprof_call_after: stack size %d", shadow_stack.size());
+    topElement->cost = bb_count - topElement->cost;
     log_trace("aprof_call_after: top element cost is %ld", topElement->cost);
 
 }

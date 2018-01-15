@@ -127,6 +127,13 @@ void AprofHook::SetupFunctions() {
              "aprof_increment_cost", this->pModule);
     ArgTypes.clear();
 
+    // aprof_increment_rms
+    FunctionType *AprofIncrementRmsType = FunctionType::get(this->VoidType, ArgTypes, false);
+    this->aprof_increment_rms = Function::Create
+            (AprofIncrementRmsType, GlobalValue::ExternalLinkage,
+             "aprof_increment_rms", this->pModule);
+    ArgTypes.clear();
+
     // aprof_write
     ArgTypes.push_back(this->VoidPointerType);
     ArgTypes.push_back(this->IntType);
@@ -184,6 +191,17 @@ void AprofHook::InsertAprofIncrementCost(Instruction *BeforeInst) {
 
 }
 
+void AprofHook::InsertAprofIncrementRms(Instruction *BeforeInst) {
+
+    CallInst *aprof_increment_rms_call = CallInst::Create(
+            this->aprof_increment_rms, "", BeforeInst);
+    aprof_increment_rms_call->setCallingConv(CallingConv::C);
+    aprof_increment_rms_call->setTailCall(false);
+    AttributeList void_call_PAL;
+    aprof_increment_rms_call->setAttributes(void_call_PAL);
+
+}
+
 void AprofHook::InsertAprofWrite(Value *var, Instruction *BeforeInst) {
 
     DataLayout *dl = new DataLayout(this->pModule);
@@ -227,6 +245,27 @@ void AprofHook::InsertAprofRead(Value *var, Instruction *BeforeInst) {
     void_51_params.push_back(ptr_50);
     void_51_params.push_back(const_int6);
     CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", BeforeInst);
+    void_51->setCallingConv(CallingConv::C);
+    void_51->setTailCall(false);
+    AttributeList void_PAL;
+    void_51->setAttributes(void_PAL);
+
+}
+
+void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
+
+    DataLayout *dl = new DataLayout(this->pModule);
+    Type *type_1 = var->getType();
+    ConstantInt *const_int6 = ConstantInt::get(
+            this->pModule->getContext(),
+            APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+
+    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
+                                       "", AfterInst);
+    std::vector<Value *> void_51_params;
+    void_51_params.push_back(ptr_50);
+    void_51_params.push_back(const_int6);
+    CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", AfterInst);
     void_51->setCallingConv(CallingConv::C);
     void_51->setTailCall(false);
     AttributeList void_PAL;
@@ -278,10 +317,14 @@ void AprofHook::SetupHooks() {
 
         Function *Func = &*FI;
 
+        if (Func->hasInternalLinkage()) {
+            continue;
+        }
+
         int FuncID = GetFunctionID(Func);
 
         if (FuncID > 0) {
-            errs() << FuncID << ":" << Func->getName() << "\n";
+            errs() << FuncID << ":" << Func->getName() << ":" << Func->hasInternalLinkage() << "\n";
             Instruction *firstInst = &*(Func->begin()->begin());
             InsertAprofCallBefore(FuncID, firstInst);
         }
@@ -304,6 +347,7 @@ void AprofHook::SetupHooks() {
                 Instruction *Inst = &*II;
 
                 switch (Inst->getOpcode()) {
+
                     case Instruction::Store: {
                         Value *secondOp = Inst->getOperand(1);
                         Type *secondOpType = secondOp->getType();
@@ -320,17 +364,29 @@ void AprofHook::SetupHooks() {
                         break;
                     }
 
+                    case Instruction::Alloca: {
+                        II++;
+                        Instruction *afterInst = &*II;
+                        InsertAprofAlloc(Inst, afterInst);
+                        II--;
+                        break;
+                    }
+
                     case Instruction::Load: {
                         // load instruction only has one operand !!!
                         Value *secondOp = Inst->getOperand(0);
-                        Type *secondOpType = secondOp->getType();
-
-                        while (isa<PointerType>(secondOpType)) {
-                            secondOpType = secondOpType->getContainedType(0);
-                        }
-
                         InsertAprofRead(secondOp, Inst);
 
+                        break;
+                    }
+
+                    case Instruction::Call: {
+                        CallSite ci(Inst);
+                        Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
+                        // fgetc automatic rms++;
+                        if (Callee->getName().str() == "fgetc") {
+                            InsertAprofIncrementRms(Inst);
+                        }
                         break;
                     }
 

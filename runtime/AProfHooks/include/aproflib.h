@@ -23,6 +23,8 @@ void aprof_read(void *memory, unsigned int length);
 
 void aprof_increment_cost();
 
+void aprof_increment_rms();
+
 void aprof_call_before(int funcId);
 
 void aprof_collect();

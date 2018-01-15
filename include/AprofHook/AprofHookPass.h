@@ -28,8 +28,10 @@ struct AprofHook : public ModulePass
 
     void InsertAprofInit(Instruction *);
     void InsertAprofIncrementCost(Instruction *);
+    void InsertAprofIncrementRms(Instruction *);
     void InsertAprofWrite(Value *, Instruction *);
     void InsertAprofRead(Value *, Instruction *);
+    void InsertAprofAlloc(Value *, Instruction *);
     void InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst);
     void InsertAprofReturn(Instruction *);
 
@@ -49,6 +51,8 @@ struct AprofHook : public ModulePass
     Function * aprof_init;
     // void aprof_increment_cost()
     Function * aprof_increment_cost;
+    // void aprof_increment_rms
+    Function *aprof_increment_rms;
     // void aprof_write(void *memory_addr, unsigned int length)
     Function *aprof_write;
     // void aprof_read(void *memory_addr, unsigned int length)

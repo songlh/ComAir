@@ -93,6 +93,13 @@ void aprof_increment_cost() {
 
 }
 
+void aprof_increment_rms() {
+    ShadowStackElement *topElement = shadow_stack.top();
+    if (topElement) {
+        topElement->rms++;
+    }
+}
+
 void aprof_call_before(int funcId) {
     count++;
     ShadowStackElement *newEle = (ShadowStackElement *) malloc(

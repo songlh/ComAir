@@ -26,6 +26,8 @@ struct AprofHook : public ModulePass
     void SetupFunctions();
     void SetupHooks();
 
+    void InstrumentCostUpdater(BasicBlock *);
+
     void InsertAprofInit(Instruction *);
     void InsertAprofIncrementCost(Instruction *);
     void InsertAprofIncrementRms(Instruction *);

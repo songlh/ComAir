@@ -153,15 +153,17 @@ void AprofHook::SetupFunctions() {
     ArgTypes.clear();
 
     // aprof_call_before
-
+    ArgTypes.push_back(this->IntType);
+    ArgTypes.push_back(this->LongType);
     FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType,
-                                                          this->IntType, false);
+                                                          ArgTypes, false);
     this->aprof_call_before = Function::Create
             (AprofCallBeforeType, GlobalValue::ExternalLinkage, "aprof_call_before", this->pModule);
     this->aprof_call_before->setCallingConv(CallingConv::C);
     ArgTypes.clear();
 
     // aprof_return
+    ArgTypes.push_back(this->LongType);
     FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
     this->aprof_return = Function::Create
             (AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return", this->pModule);
@@ -180,15 +182,15 @@ void AprofHook::InsertAprofInit(Instruction *firstInst) {
 
 }
 
-void AprofHook::InsertAprofIncrementCost(Instruction *BeforeInst) {
+void AprofHook::InstrumentCostUpdater(BasicBlock *pBlock) {
+    TerminatorInst *pTerminator = pBlock->getTerminator();
+    LoadInst *pLoadnumCost = new LoadInst(this->aprof_bb_count, "", false, pTerminator);
+    pLoadnumCost->setAlignment(8);
+    BinaryOperator *pAdd = BinaryOperator::Create(
+            Instruction::Add, pLoadnumCost, this->ConstantLong1, "add", pTerminator);
 
-    CallInst *aprof_increment_cost_call = CallInst::Create(
-            this->aprof_increment_cost, "", BeforeInst);
-    aprof_increment_cost_call->setCallingConv(CallingConv::C);
-    aprof_increment_cost_call->setTailCall(false);
-    AttributeList void_call_PAL;
-    aprof_increment_cost_call->setAttributes(void_call_PAL);
-
+    StoreInst *pStore = new StoreInst(pAdd, this->aprof_bb_count, false, pTerminator);
+    pStore->setAlignment(8);
 }
 
 void AprofHook::InsertAprofIncrementRms(Instruction *BeforeInst) {
@@ -275,13 +277,19 @@ void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
 
 
 void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
+    std::vector<Value *> vecParams;
+    LoadInst *pLoad = new LoadInst(this->aprof_bb_count, "", false, BeforeCallInst);
+    pLoad->setAlignment(8);
 
     ConstantInt *const_int6 = ConstantInt::get(
             this->pModule->getContext(),
             APInt(32, StringRef(std::to_string(FuncID)), 10));
 
+    vecParams.push_back(const_int6);
+    vecParams.push_back(pLoad);
+
     CallInst *void_46 = CallInst::Create(
-            this->aprof_call_before, const_int6, "", BeforeCallInst);
+            this->aprof_call_before, vecParams, "", BeforeCallInst);
     void_46->setCallingConv(CallingConv::C);
     void_46->setTailCall(false);
     AttributeList void_PAL;
@@ -291,7 +299,12 @@ void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
 
 
 void AprofHook::InsertAprofReturn(Instruction *BeforeInst) {
-    CallInst *void_49 = CallInst::Create(this->aprof_return, "", BeforeInst);
+    std::vector<Value *> vecParams;
+    LoadInst *pLoad = new LoadInst(this->aprof_bb_count, "", false, BeforeInst);
+    pLoad->setAlignment(8);
+    vecParams.push_back(pLoad);
+
+    CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", BeforeInst);
     void_49->setCallingConv(CallingConv::C);
     void_49->setTailCall(false);
     AttributeList void_PAL;
@@ -332,19 +345,15 @@ void AprofHook::SetupHooks() {
         for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
             BasicBlock *BB = &*BI;
-            auto BB_it = BB->begin();
-            Instruction *firstInst = &*(BB_it);
-            int Inst_ID = GetInstructionID(firstInst);
-            while (firstInst->getOpcode() == Instruction::PHI || Inst_ID == -1) {
-                BB_it++;
-                firstInst = &*(BB_it);
-                Inst_ID = GetInstructionID(firstInst);
-            }
-            InsertAprofIncrementCost(firstInst);
+            InstrumentCostUpdater(BB);
 
             for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
 
                 Instruction *Inst = &*II;
+
+                if (GetInstructionID(Inst) == -1) {
+                    continue;
+                }
 
                 switch (Inst->getOpcode()) {
 

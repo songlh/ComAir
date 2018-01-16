@@ -330,7 +330,7 @@ void AprofHook::SetupHooks() {
 
         Function *Func = &*FI;
 
-        if (Func->hasInternalLinkage()) {
+        if (Func->getSection() == ".text.startup") {
             continue;
         }
 

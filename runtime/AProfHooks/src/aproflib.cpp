@@ -1,4 +1,4 @@
-#include <stack>
+#include <vector>
 #include <unordered_map>
 
 #include "aproflib.h"
@@ -7,22 +7,16 @@
 using namespace std;
 
 unsigned long count = 0;
-std::stack<ShadowStackElement *> shadow_stack;
+std::vector<ShadowStackElement *> shadow_stack;
 std::unordered_map<unsigned long, unsigned long> ts_map;
 
 
-void logger_init() {
+int aprof_init() {
     const char *FILENAME = "aprof_logger.txt";
     int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
-    log_set_level(LEVEL);
-    log_set_fp(fp);
-    log_set_quiet(QUIET);
-}
-
-int aprof_init() {
-    logger_init();
+    log_init(fp, LEVEL, QUIET);
 }
 
 void aprof_write(void *memory_addr, unsigned int length) {
@@ -40,7 +34,7 @@ void aprof_write(void *memory_addr, unsigned int length) {
 void aprof_read(void *memory_addr, unsigned int length) {
     unsigned long i;
     unsigned long start_addr = (unsigned long) memory_addr;
-    ShadowStackElement *topEle = shadow_stack.top();
+    ShadowStackElement *topEle = shadow_stack.back();
 
     for (i = start_addr; i < (start_addr + length); i++) {
 
@@ -52,27 +46,16 @@ void aprof_read(void *memory_addr, unsigned int length) {
             log_trace("aprof_read: (ts[i]) %ld < (S[top].ts) %ld",
                       ts_map[i], topEle->ts);
 
-            std::stack<ShadowStackElement *> tempStack;
-            while (!shadow_stack.empty()) {
-
-                topEle = shadow_stack.top();
-                if (topEle->ts <= ts_map[i]) {
-
-                    topEle->rms--;
-                    break;
-
-                } else {
-
-                    tempStack.push(topEle);
-                    shadow_stack.pop();
+            if (ts_map[i] != 0) {
+                auto rit = shadow_stack.rbegin();
+                for (; rit != shadow_stack.rend(); ++rit) {
+                    topEle = *rit;
+                    if (topEle->ts <= ts_map[i]) {
+                        topEle->rms--;
+                        break;
+                    }
                 }
             }
-
-            while (!tempStack.empty()) {
-                shadow_stack.push(tempStack.top());
-                tempStack.pop();
-            }
-
         }
 
         ts_map[i] = count;
@@ -82,7 +65,7 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
 
 void aprof_increment_rms() {
-    ShadowStackElement *topElement = shadow_stack.top();
+    ShadowStackElement *topElement = shadow_stack.back();
     if (topElement) {
         topElement->rms++;
     }
@@ -97,7 +80,7 @@ void aprof_call_before(int funcId, unsigned long numCost) {
     newEle->rms = 0;
     // newEle->cost update in aprof_return
     newEle->cost = numCost;
-    shadow_stack.push(newEle);
+    shadow_stack.push_back(newEle);
     log_trace("aprof_call_before: push new element %d", funcId);
 
 }
@@ -105,19 +88,19 @@ void aprof_call_before(int funcId, unsigned long numCost) {
 
 void aprof_return(unsigned long numCost) {
 
-    ShadowStackElement *topElement = shadow_stack.top();
+    ShadowStackElement *topElement = shadow_stack.back();
     topElement->cost = numCost - topElement->cost;
 
-//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-//              topElement->funcId,
-//              topElement->rms,
-//              topElement->cost
-//    );
+    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
+              topElement->funcId,
+              topElement->rms,
+              topElement->cost
+    );
 
-    shadow_stack.pop();
+    shadow_stack.pop_back();
 
     if (shadow_stack.size() >= 2) {
-        ShadowStackElement *secondEle = shadow_stack.top();
+        ShadowStackElement *secondEle = shadow_stack.back();
         secondEle->rms += topElement->rms;
         log_trace("aprof_return: top element rms is %d", secondEle->rms);
     }

@@ -2,14 +2,6 @@
 #define APROFHOOKS_LIBRARY_H
 
 
-typedef struct _ShadowStackElem {
-    int  funcId; // function id
-    unsigned long ts; // time stamp
-    unsigned long rms;
-    unsigned long cost;
-} ShadowStackElement;
-
-
 #ifdef __cplusplus
 extern "C" {
 

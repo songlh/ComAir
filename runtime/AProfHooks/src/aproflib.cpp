@@ -3,13 +3,15 @@
 
 #include "aproflib.h"
 #include "logger.h"
+#include "stack.h"
 
 using namespace std;
 
 unsigned long count = 0;
-std::vector<ShadowStackElement *> shadow_stack;
-std::unordered_map<unsigned long, unsigned long> ts_map;
+struct stack *shadow_stack = (struct stack *) malloc(
+        sizeof(struct stack));
 
+std::unordered_map<unsigned long, unsigned long> ts_map;
 
 int aprof_init() {
     const char *FILENAME = "aprof_logger.txt";
@@ -17,6 +19,8 @@ int aprof_init() {
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, LEVEL, QUIET);
+    stack_init(shadow_stack);
+
 }
 
 void aprof_write(void *memory_addr, unsigned int length) {
@@ -34,7 +38,7 @@ void aprof_write(void *memory_addr, unsigned int length) {
 void aprof_read(void *memory_addr, unsigned int length) {
     unsigned long i;
     unsigned long start_addr = (unsigned long) memory_addr;
-    ShadowStackElement *topEle = shadow_stack.back();
+    struct stack_elem *topEle = top(shadow_stack);
 
     for (i = start_addr; i < (start_addr + length); i++) {
 
@@ -47,13 +51,13 @@ void aprof_read(void *memory_addr, unsigned int length) {
                       ts_map[i], topEle->ts);
 
             if (ts_map[i] != 0) {
-                auto rit = shadow_stack.rbegin();
-                for (; rit != shadow_stack.rend(); ++rit) {
-                    topEle = *rit;
+                while (topEle->next != NULL) {
                     if (topEle->ts <= ts_map[i]) {
                         topEle->rms--;
                         break;
                     }
+
+                    topEle = topEle->next;
                 }
             }
         }
@@ -65,22 +69,22 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
 
 void aprof_increment_rms() {
-    ShadowStackElement *topElement = shadow_stack.back();
-    if (topElement) {
+    struct stack_elem *topElement = top(shadow_stack);
+    if (topElement != NULL) {
         topElement->rms++;
     }
 }
 
 void aprof_call_before(int funcId, unsigned long numCost) {
     count++;
-    ShadowStackElement *newEle = (ShadowStackElement *) malloc(
-            sizeof(ShadowStackElement));
+    struct stack_elem *newEle = (struct stack_elem *) malloc(
+            sizeof(struct stack_elem));
     newEle->funcId = funcId;
     newEle->ts = count;
     newEle->rms = 0;
     // newEle->cost update in aprof_return
     newEle->cost = numCost;
-    shadow_stack.push_back(newEle);
+    push(shadow_stack, newEle);
     log_trace("aprof_call_before: push new element %d", funcId);
 
 }
@@ -88,7 +92,7 @@ void aprof_call_before(int funcId, unsigned long numCost) {
 
 void aprof_return(unsigned long numCost) {
 
-    ShadowStackElement *topElement = shadow_stack.back();
+    struct stack_elem *topElement = top(shadow_stack);
     topElement->cost = numCost - topElement->cost;
 
     log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
@@ -97,10 +101,10 @@ void aprof_return(unsigned long numCost) {
               topElement->cost
     );
 
-    shadow_stack.pop_back();
+    pop(shadow_stack);
 
-    if (shadow_stack.size() >= 2) {
-        ShadowStackElement *secondEle = shadow_stack.back();
+    if (size(shadow_stack) >= 2) {
+        struct stack_elem *secondEle = top(shadow_stack);
         secondEle->rms += topElement->rms;
         log_trace("aprof_return: top element rms is %d", secondEle->rms);
     }

@@ -1,7 +1,6 @@
 # Source files to be used in the library
 set(LIB_SOURCES
         src/logger.c
-        src/stack.c
         src/aproflib.cpp
         )
 

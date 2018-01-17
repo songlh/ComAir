@@ -23,8 +23,8 @@ RUNTIME_LIB=${HOME}/runtime/AProfHooks/libAProfHooks.a
 
  /HDD/llvm5.0/install/bin/llc -filetype=obj ${BC_PROF_FILE} -o ${O_PROF_FILE}
 
- # link runtime lib
- gcc Telnet.aprof.o ${RUNTIME_LIB} -lstdc++
+ # link runtime lib, must link rt
+ gcc Telnet.aprof.o ${RUNTIME_LIB} -lstdc++ -lrt
 
  ./a.out input.txt song
 }

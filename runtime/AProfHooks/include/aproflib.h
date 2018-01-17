@@ -5,7 +5,13 @@
 #ifdef __cplusplus
 extern "C" {
 
+#define BUFFERSIZE (unsigned long)1 << 24
+
+#define APROF_MEM_LOG "/aprof_log.log"
+
 void logger_init();
+
+char * _init_share_mem();
 
 int aprof_init();
 

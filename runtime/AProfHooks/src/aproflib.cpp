@@ -104,8 +104,7 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
 
 void aprof_increment_rms() {
-    struct stack_elem topElement = shadow_stack[stack_top];
-    topElement.rms++;
+    shadow_stack[stack_top].rms++;
 
 }
 
@@ -126,30 +125,29 @@ void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost = numCost - shadow_stack[stack_top].cost;
 
-//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-//              shadow_stack[stack_top].funcId,
-//              shadow_stack[stack_top].rms,
-//              shadow_stack[stack_top].cost
-//    );
+    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
+              shadow_stack[stack_top].funcId,
+              shadow_stack[stack_top].rms,
+              shadow_stack[stack_top].cost
+    );
 
-    char str[80];
-    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
-            shadow_stack[stack_top].funcId,
-            shadow_stack[stack_top].rms,
-            shadow_stack[stack_top].cost);
-    strcat(log_str, str);
-    unsigned long top_cost = shadow_stack[stack_top].cost;
-    stack_top--;
+//    char str[50];
+//    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
+//            shadow_stack[stack_top].funcId,
+//            shadow_stack[stack_top].rms,
+//            shadow_stack[stack_top].cost);
+//    strcat(log_str, str);
 
     if (stack_top >= 1) {
 
-        shadow_stack[stack_top].rms += top_cost;
+        shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
+        stack_top--;
         log_trace("aprof_return: top element rms is %d", shadow_stack[stack_top].rms);
 
     } else {
         // log result to memory.
-        void *ptr = _init_share_mem();
-        strcpy((char *) ptr, log_str);
+//        void *ptr = _init_share_mem();
+//        strcpy((char *) ptr, log_str);
     }
 
 }

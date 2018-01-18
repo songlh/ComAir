@@ -1,4 +1,5 @@
 add_subdirectory(AProf)
 add_subdirectory(AprofHook)
+add_subdirectory(Common)
 add_subdirectory(IDAssigner)
 add_subdirectory(MarkFlagForAprof)

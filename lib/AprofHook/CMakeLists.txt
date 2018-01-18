@@ -3,6 +3,8 @@ add_library(AProfHookPass MODULE
         AprofHookPass.cpp
 )
 
+target_link_libraries(AProfHookPass CommonLib)
+
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
 target_compile_features(AProfHookPass PRIVATE cxx_range_for cxx_auto_type)
 

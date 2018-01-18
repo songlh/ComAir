@@ -3,6 +3,8 @@ add_library(MarkFlagForAprofPass MODULE
         MarkFlagForAprof.cpp
 )
 
+target_link_libraries(MarkFlagForAprofPass CommonLib)
+
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
 target_compile_features(MarkFlagForAprofPass PRIVATE cxx_range_for cxx_auto_type)
 

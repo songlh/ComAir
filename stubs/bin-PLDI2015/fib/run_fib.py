@@ -32,16 +32,16 @@ def run_command():
     os.remove('test.sh')
 
 
-def clean_txt():
+def clean_temp_files():
     for dirname, dirnames, filenames in os.walk('.'):
         # print path to all filenames.
         for filename in filenames:
-            if filename.endswith('.txt'):
+            if filename.endswith('.txt') or filename.endswith('.csv'):
                 os.remove(
                     os.path.join(PATH, os.path.join(
                         dirname[2:], filename)))
 
-    print('Clean all txt file!')
+    print('Clean all temps file!')
 
 
 def _parser(file_name, run_id):
@@ -94,12 +94,15 @@ def calculate_curve_fit():
 
     popt, pcov = curve_fit(fund, xdata, ydata)
     # print [a, b]
-    print(popt)
+    to_str = [popt[0], 'x', ' ', '+', ' ', popt[1]]
+    print(''.join(to_str))
 
 
 if __name__ == '__main__':
-    clean_txt()
+    clean_temp_files()
     run_command()
     parse_log_file()
-    clean_txt()
     calculate_curve_fit()
+    # if you want to save result csv,
+    # you can comment the follow line code.
+    clean_temp_files()

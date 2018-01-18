@@ -29,6 +29,10 @@ RUNTIME_LIB=${HOME}/runtime/AProfHooks/libAProfHooks.a
  # link c++
  g++ ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lrt
 
+ # test one time
  ./a.out 3
+
+ # run some times and calculate result
+ # python run_fib.py
 
 }

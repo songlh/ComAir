@@ -99,4 +99,3 @@ if __name__ == '__main__':
     run_command()
     parse_log_file()
     clean_txt()
-    statistics()

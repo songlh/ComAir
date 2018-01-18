@@ -2,4 +2,6 @@
 
 #### 001 -- 2018-01-15  -- first version 
 
-- X (70 - 80)
+- test case Telnet 20000
+
+- X (2000+)

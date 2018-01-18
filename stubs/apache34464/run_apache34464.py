@@ -7,17 +7,33 @@ from subprocess import call
 
 import pandas as pd
 
+from scipy.optimize import curve_fit
+
+
 APROF_LOGGER = 'aprof_logger.txt'
+CASE_NAME = 'input_case_{0}.txt'
+CONSTANT_SONG = 'song'
 PATH = os.path.dirname(os.path.realpath(__file__))
 
 
+def generate_input():
+    for i in range(0, 200):
+        file_name = CASE_NAME.format(i)
+        with open(file_name, 'w') as f:
+            context = ('a' * i) + CONSTANT_SONG
+            f.write(context)
+
+        f.close()
+
+
 def run_command():
-    for i in range(0, 1):
+    for i in range(0, 200):
         if os.path.exists(APROF_LOGGER):
             new_name = APROF_LOGGER.split('.')[0] + '_' + str(i - 1) + '.txt'
             os.rename(APROF_LOGGER, new_name)
 
-        command = ['./a.out ', ' ', '20']
+        file_name = CASE_NAME.format(i)
+        command = ['./a.out ', ' ', file_name, ' ', CONSTANT_SONG]
         with open('test.sh', 'w') as run_script:
             run_script.writelines(command)
             st = os.stat('test.sh')
@@ -69,11 +85,35 @@ def parse_log_file():
                     results.append(item)
 
     df = pd.DataFrame(data=results, columns=['func_id', 'rms', 'cost', 'run_id'])
-    df.to_csv('fib_result.csv', index=False)
+    df.to_csv('apache34464_result.csv', index=False)
+
+
+def calculate_curve_fit():
+    """
+    calculate the expression of target function
+    :return:
+    """
+
+    def fund(x, a, b):
+        return x**a + b
+
+    df = pd.read_csv('apache34464_result.csv')
+    df = df.loc[df['func_id'] == 10]
+    xdata = df[['rms']].apply(pd.to_numeric)
+    ydata = df[['cost']].apply(pd.to_numeric)
+
+    xdata = [item[0] for item in xdata.values]
+    ydata = [item[0] for item in ydata.values]
+
+    popt, pcov = curve_fit(fund, xdata, ydata)
+    # print [a, b]
+    print(popt)
 
 
 if __name__ == '__main__':
     clean_txt()
+    generate_input()
     run_command()
     parse_log_file()
     clean_txt()
+    calculate_curve_fit()

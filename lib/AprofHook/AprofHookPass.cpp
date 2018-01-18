@@ -1,5 +1,3 @@
-#include "AprofHook/AprofHookPass.h"
-
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DataLayout.h"
@@ -7,6 +5,10 @@
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"
+
+#include "AprofHook/AprofHookPass.h"
+#include "Common/Constant.h"
+#include "Common/Helper.h"
 
 
 using namespace llvm;
@@ -18,52 +20,19 @@ static RegisterPass<AprofHook> X(
         "profiling algorithmic complexity",
         true, true);
 
-/* */
+/* local function */
 
-int GetFunctionID(Function *F) {
+bool HasInsertFlag(Instruction *Inst, int flag) {
 
-    if (F->begin() == F->end()) {
-        return -1;
+    int _flag = GetInstructionInsertFlag(Inst);
+
+    if (_flag == flag) {
+        return true;
     }
 
-    Instruction *I = &*(F->begin()->begin());
-
-    MDNode *Node = I->getMetadata("func_id");
-    if (!Node) {
-        return -1;
-    }
-
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
-    }
-
-    return -1;
+    return false;
 }
 
-
-int GetInstructionID(Instruction *II) {
-
-    MDNode *Node = II->getMetadata("ins_id");
-    if (!Node) {
-        return -1;
-    }
-
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
-    }
-
-    return -1;
-}
 
 /* */
 
@@ -330,14 +299,13 @@ void AprofHook::SetupHooks() {
 
         Function *Func = &*FI;
 
-        if (Func->getSection() == ".text.startup") {
+        if (IsIgnoreFunc(Func)) {
             continue;
         }
 
         int FuncID = GetFunctionID(Func);
 
         if (FuncID > 0) {
-            errs() << FuncID << ":" << Func->getName() << ":" << Func->hasInternalLinkage() << "\n";
             Instruction *firstInst = &*(Func->begin()->begin());
             InsertAprofCallBefore(FuncID, firstInst);
         }
@@ -358,44 +326,53 @@ void AprofHook::SetupHooks() {
                 switch (Inst->getOpcode()) {
 
                     case Instruction::Store: {
-                        Value *secondOp = Inst->getOperand(1);
-                        Type *secondOpType = secondOp->getType();
+                        if (HasInsertFlag(Inst, WRITE)) {
+                            Value *secondOp = Inst->getOperand(1);
+                            Type *secondOpType = secondOp->getType();
 
-                        while (isa<PointerType>(secondOpType)) {
-                            secondOpType = secondOpType->getContainedType(0);
-                        }
+                            while (isa<PointerType>(secondOpType)) {
+                                secondOpType = secondOpType->getContainedType(0);
+                            }
 
-                        // FIXME::ignore function pointer store!
-                        if (!isa<FunctionType>(secondOpType)) {
-                            InsertAprofWrite(secondOp, Inst);
+                            // FIXME::ignore function pointer store!
+                            if (!isa<FunctionType>(secondOpType)) {
+                                InsertAprofWrite(secondOp, Inst);
+                            }
                         }
 
                         break;
                     }
 
                     case Instruction::Alloca: {
-                        II++;
-                        Instruction *afterInst = &*II;
-                        InsertAprofAlloc(Inst, afterInst);
-                        II--;
+                        if (HasInsertFlag(Inst, READ)) {
+                            II++;
+                            Instruction *afterInst = &*II;
+                            InsertAprofAlloc(Inst, afterInst);
+                            II--;
+                        }
                         break;
                     }
 
                     case Instruction::Load: {
                         // load instruction only has one operand !!!
-                        Value *secondOp = Inst->getOperand(0);
-                        InsertAprofRead(secondOp, Inst);
+                        if (HasInsertFlag(Inst, READ)) {
+                            Value *firstOp = Inst->getOperand(0);
+                            InsertAprofRead(firstOp, Inst);
+                        }
 
                         break;
                     }
 
                     case Instruction::Call: {
+
                         CallSite ci(Inst);
                         Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
+
                         // fgetc automatic rms++;
                         if (Callee->getName().str() == "fgetc") {
                             InsertAprofIncrementRms(Inst);
                         }
+
                         break;
                     }
 

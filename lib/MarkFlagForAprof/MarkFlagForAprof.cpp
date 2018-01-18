@@ -1,18 +1,14 @@
 #include "llvm/Analysis/PostDominators.h"
-#include "llvm/IR/BasicBlock.h"
-#include "llvm/IR/Instruction.h"
-#include "llvm/IR/InstrTypes.h"
-#include "llvm/IR/Module.h"
+#include "llvm/IR/CallSite.h"
 #include "llvm/IR/MDBuilder.h"
-#include "llvm/Support/raw_ostream.h"
 
 #include "Common/Constant.h"
-
+#include "Common/Helper.h"
 #include "MarkFlagForAprof/MarkFlagForAprof.h"
 
 
 using namespace std;
-
+using namespace llvm;
 
 static RegisterPass<MarkFlagForAprof> X(
         "mark-flag-aprof", "mark flags for insert aprof functions", true, true);
@@ -20,88 +16,63 @@ static RegisterPass<MarkFlagForAprof> X(
 
 /* local function */
 
-int GetFunctionID(Function *F) {
+bool IsInBasicBlock(int bb_id,
+                    std::map<int, std::set<Value *>> VisitedValues,
+                    Value *var) {
 
-    if (F->begin() == F->end()) {
-        return -1;
-    }
-
-    Instruction *I = &*(F->begin()->begin());
-
-    MDNode *Node = I->getMetadata("func_id");
-    if (!Node) {
-        return -1;
-    }
-
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
-    }
-
-    return -1;
-}
-
-int GetBasicBlockID(BasicBlock *BB) {
-    if (BB->begin() == BB->end()) {
-        return -1;
-    }
-
-    Instruction *I = &*(BB->begin());
-
-    MDNode *Node = I->getMetadata("bb_id");
-    if (!Node) {
-        return -1;
-    }
-
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
-    }
-
-    return -1;
-}
-
-int GetInstructionID(Instruction *II) {
-
-    MDNode *Node = II->getMetadata("ins_id");
-    if (!Node) {
-        return -1;
-    }
-
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
-    }
-
-    return -1;
-}
-
-bool isIgnoreFunc(Function *F) {
-
-    if (F->getSection().str() == ".text.startup") {
-        return true;
-    }
-
-    int FuncID = GetFunctionID(F);
-
-    if (FuncID < 0) {
-        return true;
+    if (VisitedValues.find(bb_id) != VisitedValues.end()) {
+        std::set<Value *> temp_str_set = VisitedValues[bb_id];
+        if (temp_str_set.find(var) != temp_str_set.end()) {
+            return true;
+        }
     }
 
     return false;
+
 }
+
+std::map<int, std::set<Value *>> UpdateVisitedMap(
+        std::map<int, std::set<Value *>> VisitedValues,
+        int bb_id, Value *var) {
+
+    if (VisitedValues.find(bb_id) != VisitedValues.end()) {
+        std::set<Value *> temp_str_set = VisitedValues[bb_id];
+        if (temp_str_set.find(var) == temp_str_set.end()) {
+            temp_str_set.insert(var);
+            VisitedValues[bb_id] = temp_str_set;
+        }
+    } else {
+        std::set<Value *> str_set;
+        str_set.insert(var);
+        VisitedValues[bb_id] = str_set;
+    }
+
+    return VisitedValues;
+
+};
+
+std::map<int, std::set<Value *>> UpdatePreVisitedToCur(
+        std::map<int, std::set<Value *>> VisitedValues,
+        int pre_bb_id, int bb_id) {
+
+    if (VisitedValues.find(pre_bb_id) != VisitedValues.end()) {
+
+        std::set<Value *> temp_str_set = VisitedValues[pre_bb_id];
+
+        if (VisitedValues.find(bb_id) == VisitedValues.end()) {
+
+            VisitedValues[bb_id] = temp_str_set;
+
+        } else {
+
+            std::set<Value *> temp_bb_str_set = VisitedValues[bb_id];
+            temp_bb_str_set.insert(temp_str_set.begin(), temp_str_set.end());
+        }
+    }
+
+    return VisitedValues;
+};
+
 
 /* */
 
@@ -140,33 +111,81 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
 
     setupInit(&M);
 
-    for (Module::iterator FI = this->pModule->begin();
-         FI != this->pModule->end(); FI++) {
+    std::map<int, std::set<Value *>> VisitedValues;
+
+    for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
 
         Function *Func = &*FI;
 
-        if (isIgnoreFunc(Func)) {
+        if (IsIgnoreFunc(Func)) {
             continue;
         }
 
-        PostDominatorTree *PDT = &getAnalysis<PostDominatorTreeWrapperPass>(
-                *Func).getPostDomTree();
+        VisitedValues.clear();
 
         for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
-            errs() << "===============" << "\n";
             BasicBlock *BB = &*BI;
-            BB->dump();
 
-            DomTreeNodeBase<BasicBlock> *tree = PDT->getNode(BB);
+            int bb_id = GetBasicBlockID(BB);
 
-            for (auto TI = tree->begin(); TI != tree->end(); TI++) {
-                BasicBlock *BB = (*TI)->getBlock();
-                BB->dump();
+            BasicBlock *Pre_BB = BB->getSinglePredecessor();
+
+            if (Pre_BB) {
+                // if current bb has only one pre bb, we can update this's pre's values.
+                int pre_bb_id = GetBasicBlockID(Pre_BB);
+                VisitedValues = UpdatePreVisitedToCur(VisitedValues, pre_bb_id, bb_id);
             }
-            errs() << "===============" << "\n";
-        }
 
+            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+                Instruction *Inst = &*II;
+
+                switch (Inst->getOpcode()) {
+                    case Instruction::Alloca: {
+                        if (!IsInBasicBlock(bb_id, VisitedValues, Inst)) {
+                            markInstFlag(Inst, READ);
+                        }
+                        VisitedValues = UpdateVisitedMap(
+                                VisitedValues, bb_id, Inst);
+                        break;
+                    }
+                    case Instruction::Call: {
+                        // clear current VisitedValues.second
+                        CallSite ci(Inst);
+                        Function *Callee = dyn_cast<Function>(
+                                ci.getCalledValue()->stripPointerCasts());
+
+                        if (!IsIgnoreFunc(Callee)) {
+                            if (VisitedValues.find(bb_id) != VisitedValues.end()) {
+                                std::set<Value *> null_set;
+                                null_set.clear();
+                                VisitedValues[bb_id] = null_set;
+                            }
+                        }
+                        break;
+                    }
+                    case Instruction::Load: {
+                        Value *firstOp = Inst->getOperand(0);
+                        if (!IsInBasicBlock(bb_id, VisitedValues, firstOp)) {
+                            markInstFlag(Inst, READ);
+                        }
+                        VisitedValues = UpdateVisitedMap(
+                                VisitedValues, bb_id, firstOp);
+                        break;
+                    }
+                    case Instruction::Store: {
+                        Value *secondOp = Inst->getOperand(1);
+                        if (!IsInBasicBlock(bb_id, VisitedValues, secondOp)) {
+                            markInstFlag(Inst, WRITE);
+                        }
+                        VisitedValues = UpdateVisitedMap(
+                                VisitedValues, bb_id, secondOp);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     return false;

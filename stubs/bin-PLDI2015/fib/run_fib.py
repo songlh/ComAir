@@ -94,7 +94,13 @@ def calculate_curve_fit():
 
     popt, pcov = curve_fit(fund, xdata, ydata)
     # print [a, b]
-    to_str = [popt[0], 'x', ' ', '+', ' ', popt[1]]
+    # print y = x^a +/- b
+    op_code = '+'
+    if popt[1] < 0:
+        op_code = '-'
+        popt[1] = popt[1] * -1
+
+    to_str = ['y = ', '%.2f' % popt[0], '^x', op_code, ' ', '%.2f' % popt[1]]
     print(''.join(to_str))
 
 

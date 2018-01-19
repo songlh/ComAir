@@ -20,14 +20,14 @@ RUNTIME_LIB=${HOME}/runtime/AProfHooks/libAProfHooks.a
 
  /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/MarkFlagForAprof/libMarkFlagForAprofPass.so -mark-flag-aprof ${BC_ID_FILE} > ${BC_MARK_FILE}
 
- /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/AprofHook/libAProfHookPass.so -algo-profiling ${BC_ID_FILE} > ${BC_PROF_FILE}
+ /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/AprofHook/libAProfHookPass.so -algo-profiling ${BC_MARK_FILE} > ${BC_PROF_FILE}
 
  /HDD/llvm5.0/install/bin/llvm-dis  ${BC_PROF_FILE}
 
  /HDD/llvm5.0/install/bin/llc -filetype=obj ${BC_PROF_FILE} -o ${O_PROF_FILE}
 
  # link runtime lib, must link rt
- gcc Telnet.aprof.o ${RUNTIME_LIB} -lrt
+ gcc -O2 Telnet.aprof.o ${RUNTIME_LIB} -lrt
 
  # test one time
   ./a.out input.txt song

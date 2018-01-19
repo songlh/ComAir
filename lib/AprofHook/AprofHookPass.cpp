@@ -1,3 +1,5 @@
+#include <set>
+
 #include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DataLayout.h"
@@ -223,15 +225,39 @@ void AprofHook::InsertAprofRead(Value *var, Instruction *BeforeInst) {
 
 }
 
-void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
+void AprofHook::InsertAprofAlloc(std::set<Value *> AllocInstSet,
+                                 Instruction *AfterInst) {
 
-    DataLayout *dl = new DataLayout(this->pModule);
-    Type *type_1 = var->getType();
+    auto *dl = new DataLayout(this->pModule);
+    Value *firstValue;
+    int length = 0;
+
+    if (AllocInstSet.empty()) {
+
+        return;
+    } else {
+
+        firstValue = *AllocInstSet.begin();
+    }
+
+    for (auto it = AllocInstSet.begin(); it != AllocInstSet.end(); it++) {
+
+        Value *temp_var = *it;
+        Type *type_1 = temp_var->getType();
+        length += dl->getTypeAllocSize(type_1);
+
+    }
+
+    if (length == 0) {
+        assert((length == 0) && "Insert Aprof Alloc length is 0!");
+        return;
+    }
+
     ConstantInt *const_int6 = ConstantInt::get(
             this->pModule->getContext(),
-            APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+            APInt(32, StringRef(std::to_string(length)), 10));
 
-    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
+    CastInst *ptr_50 = new BitCastInst(firstValue, this->VoidPointerType,
                                        "", AfterInst);
     std::vector<Value *> void_51_params;
     void_51_params.push_back(ptr_50);
@@ -303,6 +329,9 @@ void AprofHook::SetupHooks() {
             continue;
         }
 
+        this->AllocInstSet.clear();
+        this->AllocInsertBefore = NULL;
+
         int FuncID = GetFunctionID(Func);
 
         if (FuncID > 0) {
@@ -326,16 +355,20 @@ void AprofHook::SetupHooks() {
                 switch (Inst->getOpcode()) {
 
                     case Instruction::Store: {
+
                         if (HasInsertFlag(Inst, WRITE)) {
+
                             Value *secondOp = Inst->getOperand(1);
                             Type *secondOpType = secondOp->getType();
 
                             while (isa<PointerType>(secondOpType)) {
+
                                 secondOpType = secondOpType->getContainedType(0);
                             }
 
                             // FIXME::ignore function pointer store!
                             if (!isa<FunctionType>(secondOpType)) {
+
                                 InsertAprofWrite(secondOp, Inst);
                             }
                         }
@@ -344,10 +377,11 @@ void AprofHook::SetupHooks() {
                     }
 
                     case Instruction::Alloca: {
+
                         if (HasInsertFlag(Inst, READ)) {
                             II++;
-                            Instruction *afterInst = &*II;
-                            InsertAprofAlloc(Inst, afterInst);
+                            this->AllocInsertBefore = &*II;
+                            this->AllocInstSet.insert(Inst);
                             II--;
                         }
                         break;
@@ -366,7 +400,8 @@ void AprofHook::SetupHooks() {
                     case Instruction::Call: {
 
                         CallSite ci(Inst);
-                        Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
+                        Function *Callee = dyn_cast<Function>(
+                                ci.getCalledValue()->stripPointerCasts());
 
                         // fgetc automatic rms++;
                         if (Callee->getName().str() == "fgetc") {
@@ -384,6 +419,8 @@ void AprofHook::SetupHooks() {
                     }
                 }
             }
+
+            InsertAprofAlloc(this->AllocInstSet, this->AllocInsertBefore);
         }
     }
 

@@ -16,6 +16,9 @@ struct AprofHook : public ModulePass
     static char ID;
     AprofHook();
 
+    std::set<Value *> AllocInstSet;
+    Instruction * AllocInsertBefore;
+
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
     virtual bool runOnModule(Module& M);
 
@@ -33,7 +36,7 @@ struct AprofHook : public ModulePass
     void InsertAprofIncrementRms(Instruction *);
     void InsertAprofWrite(Value *, Instruction *);
     void InsertAprofRead(Value *, Instruction *);
-    void InsertAprofAlloc(Value *, Instruction *);
+    void InsertAprofAlloc(std::set<Value *>, Instruction *);
     void InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst);
     void InsertAprofReturn(Instruction *);
 

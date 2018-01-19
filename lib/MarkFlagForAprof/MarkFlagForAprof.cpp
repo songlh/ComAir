@@ -79,12 +79,10 @@ std::map<int, std::set<Value *>> UpdatePreVisitedToCur(
 char MarkFlagForAprof::ID = 0;
 
 void MarkFlagForAprof::getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.addRequired<PostDominatorTreeWrapperPass>();
 
 }
 
 MarkFlagForAprof::MarkFlagForAprof() : ModulePass(ID) {
-    initializePostDominatorTreeWrapperPassPass(*PassRegistry::getPassRegistry());
 }
 
 void MarkFlagForAprof::setupTypes() {

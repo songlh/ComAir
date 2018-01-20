@@ -13,16 +13,16 @@
 // page table
 
 #define PAGE_SIZE     4096
-#define L0_TABLE_SIZE 4
+#define L0_TABLE_SIZE 16
 #define L1_TABLE_SIZE 512
-#define L4_TABLE_SIZE 1024
+#define L3_TABLE_SIZE 1024
 
-#define L0_MASK  0xC00000000000
-#define L1_MASK  0x3FE000000000
-#define L2_MASK  0x1FF0000000
-#define L3_MASK  0xFF80000
-#define L4_MASK  0x7FC00
-#define L5_MASK  0x3FF
+#define L0_MASK  0xF0000000
+#define L1_MASK  0xFF80000
+#define L2_MASK  0x7FC00
+#define L3_MASK  0x3FF
+
+#define NEG_L3_MASK 0xFFFFFC00
 
 void init_page_table();
 

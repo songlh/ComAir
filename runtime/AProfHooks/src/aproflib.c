@@ -3,20 +3,19 @@
 
 // page table
 
-// L0  46-47
-// L1  37-45
-// L2  28-36
-// L3  19-27
-// L4  10-18
-// L5   0-9
+// L0  28-31
+// L1  19-27
+// L2  10-18
+// L3   0-9
 
-void ** pL0 = NULL;
-void ** pL1 = NULL;
-void ** pL2 = NULL;
-void ** pL3 = NULL;
-void ** pL4 = NULL;
+void **pL0 = NULL;
+void **pL1 = NULL;
+void **pL2 = NULL;
 
-unsigned long * pL5 = NULL;
+unsigned long *pL3 = NULL;
+
+unsigned long prev = 0;
+unsigned long *prev_pL3 = NULL;
 
 // page table
 
@@ -26,171 +25,113 @@ struct stack_elem shadow_stack[200];
 int stack_top = -1;
 
 
-void init_page_table()
-{
-    pL0 = (void **)malloc(sizeof(void *) * L0_TABLE_SIZE);
+void init_page_table() {
+
+    pL0 = (void **) malloc(sizeof(void *) * L0_TABLE_SIZE);
     memset(pL0, 0, sizeof(void *) * L0_TABLE_SIZE);
 }
 
-unsigned long query_page_table(unsigned long addr)
-{
-    unsigned long tmp = (addr&L0_MASK) >> 46;
+unsigned long query_page_table(unsigned long addr) {
 
-    if(pL0[tmp] == NULL)
-    {
+    if ((addr & NEG_L3_MASK) == prev) {
+        return prev_pL3[addr & L3_MASK];
+    }
+
+
+    unsigned long tmp = (addr & L0_MASK) >> 28;
+
+    if (pL0[tmp] == NULL) {
         return 0;
     }
 
     pL1 = pL0[tmp];
 
-    tmp = (addr & L1_MASK) >> 37;
+    tmp = (addr & L1_MASK) >> 19;
 
-    if(pL1[tmp] == NULL)
-    {
+    if (pL1[tmp] == NULL) {
         return 0;
     }
 
     pL2 = pL1[tmp];
 
-    tmp = (addr & L2_MASK) >> 28;
+    tmp = (addr & L2_MASK) >> 10;
 
-    if(pL2[tmp] == NULL)
-    {
+    if (pL2[tmp] == NULL) {
         return 0;
     }
 
-    pL3 = pL2[tmp];
+    pL3 = (unsigned long *) pL2[tmp];
 
-    tmp = (addr & L3_MASK) >> 19;
+    prev = addr & NEG_L3_MASK;
+    prev_pL3 = pL3;
 
-    if(pL3[tmp] == NULL)
-    {
-        return 0;
-    }
-
-    pL4 = pL3[tmp];
-
-    tmp = (addr & L4_MASK) >> 10;
-
-    if(pL4[tmp] == NULL)
-    {
-        return 0;
-    }
-
-    pL5 = (unsigned long *)pL4[tmp];
-
-    return pL5[addr&L5_MASK];
+    return pL3[addr & L3_MASK];
 }
 
 
-void insert_page_table(unsigned long addr, unsigned long count)
-{
-    unsigned long tmp = (addr&L0_MASK) >> 46;
+void insert_page_table(unsigned long addr, unsigned long count) {
 
-    if(pL0[tmp] == NULL)
-    {
-        pL0[tmp] = (void **)malloc(sizeof(void *) * L1_TABLE_SIZE);
+    if ((addr & NEG_L3_MASK) == prev) {
+        prev_pL3[addr & L3_MASK] = count;
+        return;
+    }
+
+
+    unsigned long tmp = (addr & L0_MASK) >> 28;
+
+    if (pL0[tmp] == NULL) {
+        pL0[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
         memset(pL0[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
     }
 
     pL1 = pL0[tmp];
 
-    tmp = (addr & L1_MASK) >> 37;
+    tmp = (addr & L1_MASK) >> 19;
 
-    if(pL1[tmp] == NULL)
-    {
-        pL1[tmp] = (void **)malloc(sizeof(void *) * L1_TABLE_SIZE);
+    if (pL1[tmp] == NULL) {
+        pL1[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
         memset(pL1[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
     }
 
     pL2 = pL1[tmp];
 
-    tmp = (addr & L2_MASK) >> 28;
+    tmp = (addr & L2_MASK) >> 10;
 
-    if(pL2[tmp] == NULL)
-    {
-        pL2[tmp] = (void **)malloc(sizeof(void *) * L1_TABLE_SIZE);
-        memset(pL2[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
+    if (pL2[tmp] == NULL) {
+        pL2[tmp] = (unsigned long *) malloc(sizeof(unsigned long) * L3_TABLE_SIZE);
+        memset(pL2[tmp], 0, sizeof(unsigned long) * L3_TABLE_SIZE);
     }
 
-    pL3 = pL2[tmp];
+    pL3 = (unsigned long *) pL2[tmp];
 
-    tmp = (addr & L3_MASK) >> 19;
+    prev = addr & NEG_L3_MASK;
+    prev_pL3 = pL3;
 
-    if(pL3[tmp] == NULL)
-    {
-        pL3[tmp] = (void **)malloc(sizeof(void *) * L1_TABLE_SIZE);
-        memset(pL3[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
-    }
-
-    pL4 = pL3[tmp];
-
-    tmp = (addr & L4_MASK) >> 10;
-
-    if(pL4[tmp] == NULL)
-    {
-        pL4[tmp] = (unsigned long *)malloc(sizeof(unsigned long) * L4_TABLE_SIZE);
-        memset(pL4[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
-    }
-
-    pL5 = (unsigned long *)pL4[tmp];
-
-    pL5[addr&L5_MASK] = count;
+    pL3[addr & L3_MASK] = count;
 
 }
 
-void destroy_page_table()
-{
-    int i, j, k, l, m;
+void destroy_page_table() {
+    int i, j, k;
 
-    for(i = 0; i < L0_TABLE_SIZE; i ++)
-    {
-        if(pL0[i] == NULL)
-        {
+    for (i = 0; i < L0_TABLE_SIZE; i++) {
+        if (pL0[i] == NULL) {
             continue;
         }
 
-        pL1 = (void **)pL0[i];
+        pL1 = (void **) pL0[i];
 
-        for(j = 0; j < L1_TABLE_SIZE; j ++ )
-        {
-            if(pL1[j] == NULL)
-            {
+        for (j = 0; j < L1_TABLE_SIZE; j++) {
+            if (pL1[j] == NULL) {
                 continue;
             }
 
-            pL2 = (void **)pL1[j];
+            pL2 = (void **) pL1[j];
 
-            for(k = 0; k < L1_TABLE_SIZE; k ++ )
-            {
-                if(pL2[k] == NULL)
-                {
-                    continue;
+            for (k = 0; k < L1_TABLE_SIZE; k++) {
+                if (pL2[k] != NULL) {
+                    free(pL2[k]);
                 }
-
-                pL3 = (void **)pL2[k];
-
-                for(l = 0; l < L1_TABLE_SIZE; l ++)
-                {
-                    if(pL3[l] == NULL)
-                    {
-                        continue;
-                    }
-
-                    pL4 = (void **)pL3[l];
-
-                    for(m = 0; m < L1_TABLE_SIZE; m ++ )
-                    {
-                        if(pL4[m] != NULL)
-                        {
-                            free(pL4[m]);
-                        }
-                    }
-
-                    free(pL4);
-                }
-
-                free(pL3);
             }
 
             free(pL2);

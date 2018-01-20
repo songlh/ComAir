@@ -6,4 +6,4 @@
 
 - test case Telnet 20000
 
-- X (184+)
+- X (184+) without logging to file.

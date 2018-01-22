@@ -66,7 +66,7 @@ void aprof_collect();
 
 void aprof_call_after();
 
-void aprof_return(unsigned long numCost);
+void aprof_return(unsigned long numCost, unsigned long rms);
 
 
 #endif

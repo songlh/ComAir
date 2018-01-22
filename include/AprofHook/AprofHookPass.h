@@ -29,8 +29,8 @@ struct AprofHook : public ModulePass
     void InstrumentCostUpdater(BasicBlock *);
 
     void InsertAprofInit(Instruction *);
-    void InsertAprofIncrementCost(Instruction *);
-    void InsertAprofIncrementRms(Instruction *);
+//    void InsertAprofIncrementCost(Instruction *);
+//    void InsertAprofIncrementRms(Instruction *);
     void InsertAprofWrite(Value *, Instruction *);
     void InsertAprofRead(Value *, Instruction *);
     void InsertAprofAlloc(Value *, Instruction *);
@@ -38,6 +38,7 @@ struct AprofHook : public ModulePass
     void InsertAprofReturn(Instruction *);
 
     void InstrumentCostUpdater(Function * pFunction);
+    void InstrumentRmsUpdater(Function * pFunction);
 
     /* Module */
     Module *pModule;
@@ -79,6 +80,7 @@ struct AprofHook : public ModulePass
 
     /* */
     AllocaInst *BBAllocInst;
+    AllocaInst *RmsAllocInst;
     /* **** */
 
 };

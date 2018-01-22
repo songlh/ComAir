@@ -37,6 +37,8 @@ struct AprofHook : public ModulePass
     void InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst);
     void InsertAprofReturn(Instruction *);
 
+    void InstrumentCostUpdater(Function * pFunction);
+
     /* Module */
     Module *pModule;
     /* ********** */
@@ -74,6 +76,10 @@ struct AprofHook : public ModulePass
     ConstantInt * ConstantLong0;
     ConstantInt * ConstantLong1;
     /* ********** */
+
+    /* */
+    AllocaInst *BBAllocInst;
+    /* **** */
 
 };
 

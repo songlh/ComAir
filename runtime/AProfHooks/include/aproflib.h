@@ -59,7 +59,8 @@ void aprof_increment_cost();
 
 void aprof_increment_rms();
 
-void aprof_call_before(int funcId, unsigned long numCost);
+//void aprof_call_before(int funcId, unsigned long numCost);
+void aprof_call_before(int funcId);
 
 void aprof_collect();
 

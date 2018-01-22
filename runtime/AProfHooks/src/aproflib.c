@@ -225,14 +225,15 @@ void aprof_increment_rms() {
 
 }
 
-void aprof_call_before(int funcId, unsigned long numCost) {
+//void aprof_call_before(int funcId, unsigned long numCost)
+void aprof_call_before(int funcId) {
     count++;
     stack_top++;
     shadow_stack[stack_top].funcId = funcId;
     shadow_stack[stack_top].ts = count;
     shadow_stack[stack_top].rms = 0;
     // newEle->cost update in aprof_return
-    shadow_stack[stack_top].cost = numCost;
+    shadow_stack[stack_top].cost = 0;
     log_trace("aprof_call_before: push new element %d", shadow_stack[stack_top].funcId);
 
 }
@@ -240,7 +241,7 @@ void aprof_call_before(int funcId, unsigned long numCost) {
 
 void aprof_return(unsigned long numCost) {
 
-    shadow_stack[stack_top].cost = numCost - shadow_stack[stack_top].cost;
+    shadow_stack[stack_top].cost += numCost;
 
     log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
               shadow_stack[stack_top].funcId,
@@ -258,6 +259,7 @@ void aprof_return(unsigned long numCost) {
     if (stack_top >= 1) {
 
         shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
+        shadow_stack[stack_top - 1].cost += shadow_stack[stack_top].cost;
         stack_top--;
         log_trace("aprof_return: top element rms is %d", shadow_stack[stack_top].rms);
 

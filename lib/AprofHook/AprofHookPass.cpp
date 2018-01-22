@@ -61,21 +61,21 @@ void AprofHook::SetupConstants() {
 
 void AprofHook::SetupGlobals() {
 
-    assert(pModule->getGlobalVariable("aprof_count") == NULL);
-    this->aprof_count = new GlobalVariable(
-            *(this->pModule), this->LongType, false,
-            GlobalValue::ExternalLinkage, 0,
-            "aprof_count");
-    this->aprof_count->setAlignment(8);
-    this->aprof_count->setInitializer(this->ConstantLong0);
-
-    assert(pModule->getGlobalVariable("aprof_bb_count") == NULL);
-    this->aprof_bb_count = new GlobalVariable(
-            *(this->pModule), this->LongType, false,
-            GlobalValue::ExternalLinkage, 0,
-            "aprof_bb_count");
-    this->aprof_bb_count->setAlignment(8);
-    this->aprof_bb_count->setInitializer(this->ConstantLong0);
+//    assert(pModule->getGlobalVariable("aprof_count") == NULL);
+//    this->aprof_count = new GlobalVariable(
+//            *(this->pModule), this->LongType, false,
+//            GlobalValue::ExternalLinkage, 0,
+//            "aprof_count");
+//    this->aprof_count->setAlignment(8);
+//    this->aprof_count->setInitializer(this->ConstantLong0);
+//
+//    assert(pModule->getGlobalVariable("aprof_bb_count") == NULL);
+//    this->aprof_bb_count = new GlobalVariable(
+//            *(this->pModule), this->LongType, false,
+//            GlobalValue::ExternalLinkage, 0,
+//            "aprof_bb_count");
+//    this->aprof_bb_count->setAlignment(8);
+//    this->aprof_bb_count->setInitializer(this->ConstantLong0);
 
 }
 
@@ -123,7 +123,7 @@ void AprofHook::SetupFunctions() {
 
     // aprof_call_before
     ArgTypes.push_back(this->IntType);
-    ArgTypes.push_back(this->LongType);
+//    ArgTypes.push_back(this->LongType);
     FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType,
                                                           ArgTypes, false);
     this->aprof_call_before = Function::Create
@@ -151,16 +151,45 @@ void AprofHook::InsertAprofInit(Instruction *firstInst) {
 
 }
 
-void AprofHook::InstrumentCostUpdater(BasicBlock *pBlock) {
-    TerminatorInst *pTerminator = pBlock->getTerminator();
-    LoadInst *pLoadnumCost = new LoadInst(this->aprof_bb_count, "", false, pTerminator);
-    pLoadnumCost->setAlignment(8);
-    BinaryOperator *pAdd = BinaryOperator::Create(
-            Instruction::Add, pLoadnumCost, this->ConstantLong1, "add", pTerminator);
+void AprofHook::InstrumentCostUpdater(Function * pFunction) {
+    BasicBlock * pEntryBlock = &(pFunction->getEntryBlock());
+    BasicBlock::iterator itCurrent = pEntryBlock->begin();
+    Instruction * pInstBefore = &(*itCurrent);
 
-    StoreInst *pStore = new StoreInst(pAdd, this->aprof_bb_count, false, pTerminator);
+    while(isa<AllocaInst>(pInstBefore))
+    {
+        itCurrent ++;
+        pInstBefore = &(*itCurrent);
+    }
+
+    this->BBAllocInst = new AllocaInst(this->LongType, 0, "LOCAL_COST_BB", pInstBefore);
+    this->BBAllocInst->setAlignment(8);
+    StoreInst * pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, true, pInstBefore);
     pStore->setAlignment(8);
+
+    for(Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
+        BasicBlock *BB = &*BI;
+        TerminatorInst *pTerminator = BB->getTerminator();
+        LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", true, pTerminator);
+        pLoadnumCost->setAlignment(8);
+        BinaryOperator *pAdd = BinaryOperator::Create(
+                Instruction::Add, pLoadnumCost, this->ConstantLong1, "add", pTerminator);
+
+        StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, true, pTerminator);
+        pStore->setAlignment(8);
+    }
 }
+
+//void AprofHook::InstrumentCostUpdater(BasicBlock *pBlock) {
+//    TerminatorInst *pTerminator = pBlock->getTerminator();
+//    LoadInst *pLoadnumCost = new LoadInst(this->aprof_bb_count, "", false, pTerminator);
+//    pLoadnumCost->setAlignment(8);
+//    BinaryOperator *pAdd = BinaryOperator::Create(
+//            Instruction::Add, pLoadnumCost, this->ConstantLong1, "add", pTerminator);
+//
+//    StoreInst *pStore = new StoreInst(pAdd, this->aprof_bb_count, false, pTerminator);
+//    pStore->setAlignment(8);
+//}
 
 void AprofHook::InsertAprofIncrementRms(Instruction *BeforeInst) {
 
@@ -247,15 +276,15 @@ void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
 
 void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
     std::vector<Value *> vecParams;
-    LoadInst *pLoad = new LoadInst(this->aprof_bb_count, "", false, BeforeCallInst);
-    pLoad->setAlignment(8);
+//    LoadInst *pLoad = new LoadInst(this->ConstantLong0, "", false, BeforeCallInst);
+//    pLoad->setAlignment(8);
 
     ConstantInt *const_int6 = ConstantInt::get(
             this->pModule->getContext(),
             APInt(32, StringRef(std::to_string(FuncID)), 10));
 
     vecParams.push_back(const_int6);
-    vecParams.push_back(pLoad);
+//    vecParams.push_back(pLoad);
 
     CallInst *void_46 = CallInst::Create(
             this->aprof_call_before, vecParams, "", BeforeCallInst);
@@ -269,7 +298,7 @@ void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
 
 void AprofHook::InsertAprofReturn(Instruction *BeforeInst) {
     std::vector<Value *> vecParams;
-    LoadInst *pLoad = new LoadInst(this->aprof_bb_count, "", false, BeforeInst);
+    LoadInst *pLoad = new LoadInst(this->BBAllocInst, "", true, BeforeInst);
     pLoad->setAlignment(8);
     vecParams.push_back(pLoad);
 
@@ -308,12 +337,13 @@ void AprofHook::SetupHooks() {
         if (FuncID > 0) {
             Instruction *firstInst = &*(Func->begin()->begin());
             InsertAprofCallBefore(FuncID, firstInst);
+            InstrumentCostUpdater(Func);
         }
 
         for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
             BasicBlock *BB = &*BI;
-            InstrumentCostUpdater(BB);
+//            InstrumentCostUpdater(BB);
 
             for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
 

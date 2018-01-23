@@ -5,7 +5,7 @@ add_library(PathTracingPass MODULE
         PathTracing.cpp
 )
 
-#target_link_libraries(PathTracingPass)
+target_link_libraries(PathTracingPass CommonLib)
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).
 target_compile_features(PathTracingPass PRIVATE cxx_range_for cxx_auto_type)

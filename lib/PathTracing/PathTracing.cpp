@@ -18,6 +18,7 @@
 #include <list>
 #include <set>
 
+#include "Common/Helper.h"
 #include "PathTracing/BLInstrumentationGag.h"
 #include "PathTracing/PathTracing.h"
 
@@ -27,46 +28,49 @@ using namespace std;
 unsigned long HASH_THRESHHOLD;
 unsigned int PATHS_SIZE;
 
-// a special argument parser for unsigned longs
-class ULongParser : public cl::parser<unsigned long> {
-public:
-    // parse - Return true on error.
-    bool parse(cl::Option &O, const StringRef ArgName, const StringRef &Arg,
-               unsigned long &Val){
-        (void)ArgName;
-        if(Arg.getAsInteger(0, Val))
-            return O.error("'" + Arg + "' value invalid for ulong argument!");
-        return false;
-    }
+//// a special argument parser for unsigned longs
+//class ULongParser : public cl::parser<unsigned long> {
+//public:
+//    // parse - Return true on error.
+//    bool parse(cl::Option &O, const StringRef ArgName, const StringRef &Arg,
+//               unsigned long &Val){
+//        (void)ArgName;
+//        if(Arg.getAsInteger(0, Val))
+//            return O.error("'" + Arg + "' value invalid for ulong argument!");
+//        return false;
+//    }
+//
+//    // getValueName - Say what type we are expecting
+//    const char* getValueName() const{
+//        return "ulong";
+//    }
+//};
 
-    // getValueName - Say what type we are expecting
-    const char* getValueName() const{
-        return "ulong";
-    }
-};
+static cl::opt<bool> SilentInternal(
+        "pt-silent", cl::desc("Silence internal warnings.  Will still print errors which cause PT to fail."),
+        cl::init(false));
 
-static cl::opt<bool> SilentInternal("pt-silent", cl::desc("Silence internal "
-                                                                  "warnings.  Will still print errors which "
-                                                                  "cause PT to fail."));
+static cl::opt<bool> NoArrayWrites(
+        "pt-no-array-writes",
+        cl::Hidden,
+        cl::desc("Don't instrument loads and stores to the path array. DEBUG ONLY"),
+        cl::init(true));
 
-static cl::opt<bool> NoArrayWrites("pt-no-array-writes", cl::Hidden,
-                                   cl::desc("Don't instrument loads and stores to the path array. "
-                                                    "DEBUG ONLY"));
+//static cl::opt<unsigned long, false, ULongParser> HashSize("pt-hash-size",
+//                                                           cl::desc("Set the maximum acyclic path count "
+//                                                                            "to instrument per function. "
+//                                                                            "Default: ULONG_MAX / 2 - 1"),
+//                                                           cl::value_desc("hash_size"));
 
-static cl::opt<unsigned long, false, ULongParser> HashSize("pt-hash-size",
-                                                           cl::desc("Set the maximum acyclic path count "
-                                                                            "to instrument per function. "
-                                                                            "Default: ULONG_MAX / 2 - 1"),
-                                                           cl::value_desc("hash_size"));
+//static cl::opt<int> ArraySize("pt-path-array-size", cl::desc("Set the size "
+//                                                                     "of the paths array for instrumented "
+//                                                                     "functions.  Default: 10"),
+//                              cl::value_desc("path_array_size"));
 
-static cl::opt<int> ArraySize("pt-path-array-size", cl::desc("Set the size "
-                                                                     "of the paths array for instrumented "
-                                                                     "functions.  Default: 10"),
-                              cl::value_desc("path_array_size"));
-
-static cl::opt<string> TrackerFile("pt-info-file", cl::desc("The path to "
-                                                                    "the increment-line-number output file."),
-                                   cl::value_desc("file_path"));
+static cl::opt<string> TrackerFile(
+        "pt-info-file",
+        cl::desc("The path to the increment-line-number output file."),
+        cl::value_desc("file_path"));
 
 
 // Register path tracing as a pass
@@ -76,6 +80,16 @@ static RegisterPass<PathTracing> X(
         "pt-inst",
         "Insert instrumentation for Ball-Larus tracing",
         false, false);
+
+// Gets the path tracker
+Value *PathTracing::getPathTracker() {
+    return _pathTracker;
+}
+
+// Set the path tracker
+void PathTracing::setPathTracker(Value *c) {
+    _pathTracker = c;
+}
 
 // Creates an increment constant representing incr.
 ConstantInt *PathTracing::createIncrementConstant(long incr,
@@ -312,10 +326,7 @@ bool PathTracing::splitCritical(BLInstrumentationEdge *edge,
         return (false);
 }
 
-// NOTE: could handle inlining specially here if desired.
-static void writeBBLineNums(BasicBlock *bb,
-                            BLInstrumentationDag *dag,
-                            raw_ostream &stream = outs()) {
+static void writeBBLineNums(BasicBlock *bb, BLInstrumentationDag *dag, ofstream &stream) {
     if (!bb) {
         stream << "|NULL";
         return;
@@ -329,7 +340,7 @@ static void writeBBLineNums(BasicBlock *bb,
                 continue;
 
         dbLoc = i->getDebugLoc();
-        if (!dbLoc.isUnknown()) {
+        if (dbLoc) {
             stream << '|' << dbLoc.getLine(); // << ':' << dbLoc.getCol();
             any = true;
         } else if (LoadInst *inst = dyn_cast<LoadInst>(&*i)) {
@@ -341,15 +352,9 @@ static void writeBBLineNums(BasicBlock *bb,
         }
     }
 
-    // write NULL if there are no debug locations in the basic block
+// write NULL if there are no debug locations in the basic block
     if (!any)
         stream << "|NULL";
-}
-
-
-static void writeBBLineNums(BasicBlock *bb, BLInstrumentationDag *dag, ostream &stream) {
-    raw_os_ostream wrapped(stream);
-    writeBBLineNums(bb, dag, wrapped);
 }
 
 
@@ -449,9 +454,9 @@ void PathTracing::writeTrackerInfo(Function &F, BLInstrumentationDag *dag) {
 
 // Entry point of the function
 bool PathTracing::runOnFunction(Function &F) {
-    PrepareCSI &instData = getAnalysis<PrepareCSI>();
-    if (F.isDeclaration() || !instData.hasInstrumentationType(F, "PT"))
-        return false;
+//    PrepareCSI &instData = getAnalysis<PrepareCSI>();
+//    if (F.isDeclaration() || !instData.hasInstrumentationType(F, "PT"))
+//        return false;
     errs() << "Function: " << F.getName() << '\n';
 
     // Build DAG from CFG
@@ -510,34 +515,34 @@ bool PathTracing::runOnFunction(Function &F) {
 
         // create debug info for new variables
         DIBuilder Builder(*F.getParent());
-        DIType intType = Builder.createBasicType("__pt_int", 64, 64, dwarf::DW_ATE_signed);
-        const DIType arrType = createArrayType(Builder, PATHS_SIZE, intType);
+//        DIBasicType *intType = Builder.createBasicType("__pt_int", 64, 64);
+//        const DIType arrType = Builder.createArrayType(PATHS_SIZE, 8, intType);
 
-        // get the debug location of any instruction in this basic block--this will
-        // use the same info.  If there is none, technically we should build it, but
-        // that's a huge pain (if it's possible) so I just give up right now
-        const DebugLoc dbLoc = findEarlyDebugLoc(F, SilentInternal);
-        if (!dbLoc.isUnknown()) {
-            DIVariable arrDI = Builder.createLocalVariable(
-                    (unsigned) dwarf::DW_TAG_auto_variable,
-                    DIDescriptor(dbLoc.getScope(*Context)),
-                    "__PT_counter_arr",
-                    DIFile(dbLoc.getScope(*Context)), 0, arrType, true);
-            insertDeclare(Builder, arrInst, arrDI, dbLoc, entryInst);
-            DIVariable idxDI = Builder.createLocalVariable(
-                    (unsigned) dwarf::DW_TAG_auto_variable,
-                    DIDescriptor(dbLoc.getScope(*Context)),
-                    "__PT_counter_idx",
-                    DIFile(dbLoc.getScope(*Context)), 0, intType, true);
-            insertDeclare(Builder, idxInst, idxDI, dbLoc, entryInst);
-            DIVariable trackDI = Builder.createLocalVariable(
-                    (unsigned) dwarf::DW_TAG_auto_variable,
-                    DIDescriptor(dbLoc.getScope(*Context)),
-                    "__PT_current_path",
-                    DIFile(dbLoc.getScope(*Context)), 0, intType,
-                    true);
-            insertDeclare(Builder, trackInst, trackDI, dbLoc, entryInst);
-        }
+//        // get the debug location of any instruction in this basic block--this will
+//        // use the same info.  If there is none, technically we should build it, but
+//        // that's a huge pain (if it's possible) so I just give up right now
+//        const DebugLoc dbLoc = findEarlyDebugLoc(F, SilentInternal);
+//        if (dbLoc) {
+//            DIVariable arrDI = Builder.createLocalVariable(
+//                    (unsigned) dwarf::DW_TAG_auto_variable,
+//                    DIDescriptor(dbLoc.getScope(*Context)),
+//                    "__PT_counter_arr",
+//                    DIFile(dbLoc.getScope(*Context)), 0, arrType, true);
+//            insertDeclare(Builder, arrInst, arrDI, dbLoc, entryInst);
+//            DIVariable idxDI = Builder.createLocalVariable(
+//                    (unsigned) dwarf::DW_TAG_auto_variable,
+//                    DIDescriptor(dbLoc.getScope(*Context)),
+//                    "__PT_counter_idx",
+//                    DIFile(dbLoc.getScope(*Context)), 0, intType, true);
+//            insertDeclare(Builder, idxInst, idxDI, dbLoc, entryInst);
+//            DIVariable trackDI = Builder.createLocalVariable(
+//                    (unsigned) dwarf::DW_TAG_auto_variable,
+//                    DIDescriptor(dbLoc.getScope(*Context)),
+//                    "__PT_current_path",
+//                    DIFile(dbLoc.getScope(*Context)), 0, intType,
+//                    true);
+//            insertDeclare(Builder, trackInst, trackDI, dbLoc, entryInst);
+//        }
 
         // do the instrumentation and write out the path info to the .info file
         insertInstrumentation(dag);
@@ -568,19 +573,26 @@ bool PathTracing::runOnModule(Module &M) {
 
     this->Context = &M.getContext();
 
-    if (ArraySize > 0)
-        PATHS_SIZE = ArraySize;
-    else
-        PATHS_SIZE = 10;
+//    if (ArraySize > 0)
+//        PATHS_SIZE = ArraySize;
+//    else
+    PATHS_SIZE = 100;
 
-    if (HashSize > 0)
-        HASH_THRESHHOLD = HashSize;
-    else
-        HASH_THRESHHOLD = ULONG_MAX / 2 - 1;
+//    if (HashSize > 0)
+//        HASH_THRESHHOLD = HashSize;
+//    else
+    HASH_THRESHHOLD = ULONG_MAX / 2 - 1;
 
     bool changed = false;
     for (Module::iterator i = M.begin(), e = M.end(); i != e; ++i) {
-        changed |= runOnFunction(*i);
+
+        Function *F = &*i;
+
+        if (IsIgnoreFunc(F)) {
+            continue;
+        }
+
+        changed |= runOnFunction(*F);
     }
 
     trackerStream.close();

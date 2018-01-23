@@ -36,7 +36,7 @@
 
 #include "PathTracing/PPBallLarusDag.h"
 
-#include <llvm/Pass.h>
+#include "llvm/Pass.h"
 
 #include "llvm/IR/CFG.h"
 #include "llvm/IR/DebugInfo.h"
@@ -118,7 +118,7 @@ public:
   static char ID; // Pass identification, replacement for typeid
   PathTracing() : ModulePass(ID) {}
 
-  void getAnalysisUsage(llvm::AnalysisUsage &) const;
+//  void getAnalysisUsage(llvm::AnalysisUsage &) const;
 };
 
 #endif

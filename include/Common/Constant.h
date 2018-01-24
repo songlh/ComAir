@@ -13,5 +13,6 @@ enum {
     COST_UPDATE = 6,
 };
 
+#define BB_COST_FLAG "bb_cost_flag"
 
 #endif //COMAIR_CONSTANT_H

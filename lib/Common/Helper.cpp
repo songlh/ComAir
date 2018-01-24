@@ -110,3 +110,29 @@ bool IsIgnoreFunc(Function *F) {
 
     return false;
 }
+
+int GetBBCostNum(BasicBlock *BB) {
+
+    MDNode *Node;
+
+    for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+        Instruction *Inst = &*II;
+        MDNode *Node = Inst->getMetadata(BB_COST_FLAG);
+        if (!Node) {
+            continue;
+        }
+
+        assert(Node->getNumOperands() == 1);
+        const Metadata *MD = Node->getOperand(0);
+        if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
+            Value *V = MDV->getValue();
+            ConstantInt *CI = dyn_cast<ConstantInt>(V);
+            assert(CI);
+            return CI->getZExtValue();
+        }
+    }
+
+    return -1;
+
+}

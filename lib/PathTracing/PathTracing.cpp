@@ -164,13 +164,15 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
     BLInstrumentationNode *targetNode = (BLInstrumentationNode *) edge->getTarget();
     BLInstrumentationNode *instrumentNode;
 
+    errs() << sourceNode->getName() << "->" << targetNode->getName() << "\n";
+
     bool atBeginning = false;
 
     // Source node has only 1 successor so any information can be simply
     // inserted in to it without splitting
     if (sourceNode->getBlock() && sourceNode->getNumberSuccEdges() <= 1) {
-        errs() << "  Potential instructions to be placed in: "
-               << sourceNode->getName() << " (at end)\n";
+//        errs() << "  Potential instructions to be placed in: "
+//               << sourceNode->getName() << " (at end)\n";
         instrumentNode = sourceNode;
     }
 
@@ -178,8 +180,8 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
         // instrumentation into it. If there was splitting, it must have been
         // successful.
     else if (targetNode->getNumberPredEdges() == 1) {
-        errs() << "  Potential instructions to be placed in: "
-               << targetNode->getName() << " (at beginning)\n";
+//        errs() << "  Potential instructions to be placed in: "
+//               << targetNode->getName() << " (at beginning)\n";
         instrumentNode = targetNode;
         atBeginning = true;
     }
@@ -189,6 +191,8 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
         errs() << "ERROR: Instrumenting could not split a critical edge.\n";
         exit(1);
     }
+
+    Instruction *Inst;
 
     // Insert instrumentation if this is a back or split edge
     if (edge->getType() == PPBallLarusEdge::BACKEDGE ||
@@ -202,8 +206,6 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
                 " contain a path number initialization.");
         assert(bottom->isCounterIncrement() && " Bottom phony edge"
                 " did not contain a path counter increment.");
-
-        Instruction *Inst;
 
         if (atBeginning) {
             Inst = &*instrumentNode->getBlock()->getFirstInsertionPt();
@@ -229,6 +231,8 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
 
         new StoreInst(createIncrementConstant(top), this->getPathTracker(), true,
                       Inst);
+        Inst->dump();
+        errs() << "update \n";
 
         // Check for path counter increments: we would never expect the top edge to
         // also be a counter increment, but we'll handle it anyways
@@ -244,8 +248,6 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
         // Insert instrumentation if this is a normal edge
     else {
 
-        Instruction *Inst;
-
         if (atBeginning) {
             Inst = &*instrumentNode->getBlock()->getFirstInsertionPt();
         } else {
@@ -253,9 +255,13 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
         }
 
         if (edge->isInitialization()) { // initialize path number
+
             new StoreInst(createIncrementConstant(edge),
                           this->getPathTracker(), true,
                           Inst);
+            Inst->dump();
+            errs() << "update \n";
+
         } else if (edge->getIncrement()) {// increment path number
             Instruction *oldValue = new LoadInst(this->getPathTracker(),
                                                  "oldVal", Inst);
@@ -263,6 +269,8 @@ void PathTracing::insertInstrumentationStartingAt(BLInstrumentationEdge *edge,
                                                            oldValue, createIncrementConstant(edge),
                                                            "pathNumber", Inst);
             new StoreInst(newValue, this->getPathTracker(), true, Inst);
+            Inst->dump();
+            errs() << "update \n";
         }
 
         // Check for path counter increments (function exit)
@@ -576,7 +584,7 @@ bool PathTracing::runOnModule(Module &M) {
 //    if (ArraySize > 0)
 //        PATHS_SIZE = ArraySize;
 //    else
-    PATHS_SIZE = 100;
+    PATHS_SIZE = 10;
 
 //    if (HashSize > 0)
 //        HASH_THRESHHOLD = HashSize;

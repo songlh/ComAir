@@ -1,4 +1,5 @@
 #include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DebugInfo.h"
@@ -19,6 +20,10 @@ static RegisterPass<AprofHook> X(
         "algo-profiling",
         "profiling algorithmic complexity",
         true, true);
+
+static cl::opt<int> onlyBBCount("only-bb-count",
+                                cl::desc("only insert bb count."),
+                                cl::init(0));
 
 /* local function */
 
@@ -136,6 +141,29 @@ void AprofHook::InsertAprofInit(Instruction *firstInst) {
 
 }
 
+void AprofHook::InstrumentCostUpdater(BasicBlock *pBlock) {
+
+    int NumCost = GetBBCostNum(pBlock);
+
+    if (NumCost > 0) {
+
+        TerminatorInst *pTerminator = pBlock->getTerminator();
+        LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", true, pTerminator);
+        pLoadnumCost->setAlignment(8);
+
+        Type *tInt = Type::getInt64Ty(pModule->getContext());
+
+        BinaryOperator *pAdd = BinaryOperator::Create(
+                Instruction::Add, pLoadnumCost,
+                ConstantInt::get(tInt, NumCost),
+                "add", pTerminator);
+
+        StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, true, pTerminator);
+        pStore->setAlignment(8);
+
+    }
+}
+
 void AprofHook::InstrumentCostUpdater(Function *pFunction) {
     BasicBlock *pEntryBlock = &(pFunction->getEntryBlock());
     BasicBlock::iterator itCurrent = pEntryBlock->begin();
@@ -151,17 +179,6 @@ void AprofHook::InstrumentCostUpdater(Function *pFunction) {
     StoreInst *pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, false, pInstBefore);
     pStore->setAlignment(8);
 
-    for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
-        BasicBlock *BB = &*BI;
-        TerminatorInst *pTerminator = BB->getTerminator();
-        LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pTerminator);
-        pLoadnumCost->setAlignment(8);
-        BinaryOperator *pAdd = BinaryOperator::Create(
-                Instruction::Add, pLoadnumCost, this->ConstantLong1, "add", pTerminator);
-
-        StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, false, pTerminator);
-        pStore->setAlignment(8);
-    }
 }
 
 void AprofHook::InsertAprofWrite(Value *var, Instruction *BeforeInst) {
@@ -235,7 +252,6 @@ void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
 
 }
 
-
 void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
     std::vector<Value *> vecParams;
 
@@ -266,7 +282,7 @@ void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
 
     this->RmsAllocInst = new AllocaInst(this->LongType, 0, "aprof_rms", pInstBefore);
     this->RmsAllocInst->setAlignment(8);
-    StoreInst *pStore = new StoreInst(this->ConstantLong0, this->RmsAllocInst, false, pInstBefore);
+    StoreInst *pStore = new StoreInst(this->ConstantLong0, this->RmsAllocInst, true, pInstBefore);
     pStore->setAlignment(8);
 
     for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
@@ -289,12 +305,12 @@ void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
 
                     // fgetc automatic rms++;
                     if (Callee->getName().str() == "fgetc") {
-                        LoadInst *pLoadnumCost = new LoadInst(this->RmsAllocInst, "", false, Inst);
+                        LoadInst *pLoadnumCost = new LoadInst(this->RmsAllocInst, "", true, Inst);
                         pLoadnumCost->setAlignment(8);
                         BinaryOperator *pAdd = BinaryOperator::Create(
                                 Instruction::Add, pLoadnumCost, this->ConstantLong1, "add", Inst);
 
-                        StoreInst *pStore = new StoreInst(pAdd, this->RmsAllocInst, false, Inst);
+                        StoreInst *pStore = new StoreInst(pAdd, this->RmsAllocInst, true, Inst);
                         pStore->setAlignment(8);
                     }
 
@@ -306,21 +322,117 @@ void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
     }
 }
 
-
-void AprofHook::InsertAprofReturn(Instruction *BeforeInst) {
+void AprofHook::InsertAprofReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
     std::vector<Value *> vecParams;
-    LoadInst *bb_pLoad = new LoadInst(this->BBAllocInst, "", false, BeforeInst);
+    LoadInst *bb_pLoad = new LoadInst(this->BBAllocInst, "", true, BeforeInst);
     bb_pLoad->setAlignment(8);
-    LoadInst *rms_pLoad = new LoadInst(this->RmsAllocInst, "", false, BeforeInst);
-    rms_pLoad->setAlignment(8);
     vecParams.push_back(bb_pLoad);
-    vecParams.push_back(rms_pLoad);
+
+    if (NeedUpdateRms) {
+        LoadInst *rms_pLoad = new LoadInst(this->RmsAllocInst, "", true, BeforeInst);
+        rms_pLoad->setAlignment(8);
+        vecParams.push_back(rms_pLoad);
+    } else {
+        vecParams.push_back(this->ConstantLong0);
+    }
 
     CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", BeforeInst);
     void_49->setCallingConv(CallingConv::C);
     void_49->setTailCall(false);
     AttributeList void_PAL;
     void_49->setAttributes(void_PAL);
+}
+
+void AprofHook::InsertAprofHooks(Function *Func) {
+
+    int FuncID = GetFunctionID(Func);
+
+    bool need_update_rms = false;
+
+    if (FuncID > 0) {
+        Instruction *firstInst = &*(Func->begin()->begin());
+        InsertAprofCallBefore(FuncID, firstInst);
+        InstrumentCostUpdater(Func);
+//        InstrumentRmsUpdater(Func);
+    }
+
+    for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+
+        InstrumentCostUpdater(BB);
+
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            if (GetInstructionID(Inst) == -1) {
+                continue;
+            }
+
+            switch (Inst->getOpcode()) {
+
+                case Instruction::Store: {
+                    if (HasInsertFlag(Inst, WRITE)) {
+                        Value *secondOp = Inst->getOperand(1);
+                        Type *secondOpType = secondOp->getType();
+
+                        while (isa<PointerType>(secondOpType)) {
+                            secondOpType = secondOpType->getContainedType(0);
+                        }
+                        // FIXME::ignore function pointer store!
+                        if (!isa<FunctionType>(secondOpType)) {
+                            InsertAprofWrite(secondOp, Inst);
+                        }
+                    }
+
+                    break;
+                }
+
+                case Instruction::Alloca: {
+                    if (HasInsertFlag(Inst, READ)) {
+                        II++;
+                        Instruction *afterInst = &*II;
+                        InsertAprofAlloc(Inst, afterInst);
+                        II--;
+                    }
+                    break;
+                }
+
+                case Instruction::Load: {
+                    // load instruction only has one operand !!!
+                    if (HasInsertFlag(Inst, READ)) {
+                        Value *firstOp = Inst->getOperand(0);
+                        InsertAprofRead(firstOp, Inst);
+                    }
+
+                    break;
+                }
+
+                case Instruction::Call: {
+
+                    CallSite ci(Inst);
+                    Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
+
+                    // fgetc automatic rms++;
+                    if (Callee->getName().str() == "fgetc") {
+                        need_update_rms = true;
+                        InstrumentRmsUpdater(Inst->getFunction());
+                    }
+
+                    break;
+                }
+
+                case Instruction::Ret: {
+
+                    InsertAprofReturn(Inst, need_update_rms);
+
+                    break;
+                }
+            }
+        }
+    }
+
 }
 
 void AprofHook::SetupInit() {
@@ -346,76 +458,8 @@ void AprofHook::SetupHooks() {
             continue;
         }
 
-        int FuncID = GetFunctionID(Func);
+        InsertAprofHooks(Func);
 
-        if (FuncID > 0) {
-            Instruction *firstInst = &*(Func->begin()->begin());
-            InsertAprofCallBefore(FuncID, firstInst);
-            InstrumentCostUpdater(Func);
-            InstrumentRmsUpdater(Func);
-        }
-
-        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
-
-            BasicBlock *BB = &*BI;
-
-            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
-
-                Instruction *Inst = &*II;
-
-                if (GetInstructionID(Inst) == -1) {
-                    continue;
-                }
-
-                switch (Inst->getOpcode()) {
-
-                    case Instruction::Store: {
-                        if (HasInsertFlag(Inst, WRITE)) {
-                            Value *secondOp = Inst->getOperand(1);
-                            Type *secondOpType = secondOp->getType();
-
-                            while (isa<PointerType>(secondOpType)) {
-                                secondOpType = secondOpType->getContainedType(0);
-                            }
-
-                            // FIXME::ignore function pointer store!
-                            if (!isa<FunctionType>(secondOpType)) {
-                                InsertAprofWrite(secondOp, Inst);
-                            }
-                        }
-
-                        break;
-                    }
-
-                    case Instruction::Alloca: {
-                        if (HasInsertFlag(Inst, READ)) {
-                            II++;
-                            Instruction *afterInst = &*II;
-                            InsertAprofAlloc(Inst, afterInst);
-                            II--;
-                        }
-                        break;
-                    }
-
-                    case Instruction::Load: {
-                        // load instruction only has one operand !!!
-                        if (HasInsertFlag(Inst, READ)) {
-                            Value *firstOp = Inst->getOperand(0);
-                            InsertAprofRead(firstOp, Inst);
-                        }
-
-                        break;
-                    }
-
-                    case Instruction::Ret: {
-
-                        InsertAprofReturn(Inst);
-
-                        break;
-                    }
-                }
-            }
-        }
     }
 
     Function *MainFunc = this->pModule->getFunction("main");

@@ -17,5 +17,7 @@ int GetInstructionInsertFlag(Instruction *II);
 
 bool IsIgnoreFunc(Function *F);
 
+int GetBBCostNum(BasicBlock *BB);
+
 
 #endif //COMAIR_HELPER_H

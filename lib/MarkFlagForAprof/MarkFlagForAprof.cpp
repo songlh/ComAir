@@ -1,3 +1,7 @@
+#include <map>
+#include <set>
+#include <stack>
+
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/MDBuilder.h"
@@ -73,6 +77,26 @@ std::map<int, std::set<Value *>> UpdatePreVisitedToCur(
     return VisitedValues;
 };
 
+bool isSuccAllSinglePredecessor(BasicBlock *BB) {
+
+    // mat be BB is the last basic block!
+    TerminatorInst *terInst = BB->getTerminator();
+    if (terInst->getNumSuccessors() == 0) {
+        return false;
+    }
+
+    for (succ_iterator si = succ_begin(BB); si != succ_end(BB); si++) {
+
+        BasicBlock *sucBB = *si;
+
+        if (!sucBB->getSinglePredecessor()) {
+            return false;
+        }
+    }
+
+    return true;
+
+}
 
 /* */
 
@@ -107,6 +131,135 @@ void MarkFlagForAprof::markInstFlag(Instruction *Inst, int Flag) {
     );
 }
 
+void MarkFlagForAprof::MarkFlag(BasicBlock *BB, int Num) {
+
+    MDBuilder MDHelper(this->pModule->getContext());
+
+    Instruction *Inst = &*(BB->getFirstInsertionPt());
+
+    if (Inst) {
+
+        Constant *InsID = ConstantInt::get(this->IntType, Num);
+        SmallVector<Metadata *, 1> Vals;
+        Vals.push_back(MDHelper.createConstant(InsID));
+        Inst->setMetadata(BB_COST_FLAG, MDNode::get(
+                this->pModule->getContext(), Vals));
+
+    } else {
+
+        errs() << "Current Basic Block could not find an"
+                " instruction to mark bb cost flag." << "\n";
+    }
+
+}
+
+void MarkFlagForAprof::MarkBBFlag(Function *F) {
+    std::stack<BasicBlock *> VisitedStack;
+    std::map<BasicBlock *, int> MarkedMap;
+    std::set<BasicBlock *> VisitedSet;
+
+    BasicBlock *firstBB = &*(F->begin());
+
+    if (firstBB) {
+        VisitedStack.push(firstBB);
+        MarkedMap[firstBB] = 1;
+    }
+
+    while (!VisitedStack.empty()) {
+
+        BasicBlock *topBB = VisitedStack.top();
+        VisitedStack.pop();
+
+        if (VisitedSet.find(topBB) == VisitedSet.end())
+            VisitedSet.insert(topBB);
+        else
+            continue;
+
+        // last bb
+        TerminatorInst *terInst = topBB->getTerminator();
+        if (terInst->getNumSuccessors() == 0) {
+            continue;
+        }
+
+        int _count = 1;
+
+        if (isSuccAllSinglePredecessor(topBB)) {
+
+            _count = MarkedMap[topBB] + 1;
+            MarkedMap.erase(topBB);
+        }
+
+        for (succ_iterator si = succ_begin(topBB); si != succ_end(topBB); si++) {
+
+            if (VisitedSet.find(*si) != VisitedSet.end())
+                continue;
+
+            VisitedStack.push(*si);
+            MarkedMap[*si] = _count;
+        }
+    }
+
+    std::map<BasicBlock *, int>::iterator
+            itMapBegin = MarkedMap.begin();
+    std::map<BasicBlock *, int>::iterator
+            itMapEnd = MarkedMap.end();
+
+    while (itMapBegin != itMapEnd) {
+
+        auto *itBB = itMapBegin->first;
+
+        if (!itBB->getSinglePredecessor()) {
+
+            std::set<BasicBlock *> preSet;
+            int preCount = 0;
+            bool flag = true;
+
+            for (auto it = pred_begin(itBB), et = pred_end(itBB); it != et; ++it) {
+
+                if (MarkedMap.find(*it) == MarkedMap.end()) {
+                    flag = false;
+                    break;
+                }
+
+                if (preCount == 0) {
+                    preCount = MarkedMap[*it];
+
+                } else if (preCount != MarkedMap[*it]) {
+                    flag = false;
+                    break;
+
+                }
+
+                preSet.insert(*it);
+
+            }
+
+            if (flag) {
+
+                // erase preSet and update itBB's count
+                for (auto it: preSet) {
+                    MarkedMap.erase(it);
+                }
+
+                MarkedMap[itBB] = preCount + 1;
+            }
+        }
+
+        itMapBegin++;
+    }
+
+
+    itMapBegin = MarkedMap.begin();
+    itMapEnd = MarkedMap.end();
+
+    while (itMapBegin != itMapEnd) {
+        MarkFlag(itMapBegin->first, itMapBegin->second);
+        itMapBegin++;
+
+    }
+
+}
+
 bool MarkFlagForAprof::runOnModule(Module &M) {
 
     setupInit(&M);
@@ -120,6 +273,8 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
         if (IsIgnoreFunc(Func)) {
             continue;
         }
+
+        MarkBBFlag(Func);
 
         VisitedValues.clear();
 

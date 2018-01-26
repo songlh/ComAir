@@ -15,4 +15,6 @@ enum {
 
 #define BB_COST_FLAG "bb_cost_flag"
 
+#define CLONE_FUNCTION_PREFIX "$aprof$"
+
 #endif //COMAIR_CONSTANT_H

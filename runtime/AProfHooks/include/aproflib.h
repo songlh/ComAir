@@ -1,12 +1,15 @@
 #ifndef APROFHOOKS_LIBRARY_H
 #define APROFHOOKS_LIBRARY_H
 
+#include <errno.h>
 #include <fcntl.h>
 #include <malloc.h>
+#include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <time.h>
 #include <unistd.h>
 
 
@@ -68,5 +71,9 @@ void aprof_call_after();
 
 void aprof_return(unsigned long numCost, unsigned long rms);
 
+
+//----- sampling generator---------
+int aprof_geo(int iRate);            // Returns a geometric random variable
+static double rand_val(int seed);    // Jain's RNG
 
 #endif

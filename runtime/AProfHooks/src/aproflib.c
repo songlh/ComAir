@@ -24,6 +24,9 @@ unsigned long count = 0;
 struct stack_elem shadow_stack[200];
 int stack_top = -1;
 
+// used to sampling
+static int old_value = -1;
+
 
 void init_page_table() {
 
@@ -145,7 +148,7 @@ void destroy_page_table() {
 
 void logger_init() {
     const char *FILENAME = "aprof_logger.txt";
-    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int LEVEL = 2;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, LEVEL, QUIET);
@@ -167,11 +170,10 @@ char *_init_share_mem() {
 
 int aprof_init() {
     // if we do not need debug, we should close this.
-//    logger_init();
+    logger_init();
 //    _init_share_mem();
     init_page_table();
 }
-
 
 void aprof_write(void *memory_addr, unsigned int length) {
     unsigned long start_addr = (unsigned long) memory_addr;
@@ -220,7 +222,6 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
 }
 
-
 void aprof_increment_rms() {
     shadow_stack[stack_top].rms++;
 
@@ -239,24 +240,23 @@ void aprof_call_before(int funcId) {
 
 }
 
-
 void aprof_return(unsigned long numCost, unsigned long rms) {
 
     shadow_stack[stack_top].cost += numCost;
     shadow_stack[stack_top].rms += rms;
 
-//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-//              shadow_stack[stack_top].funcId,
-//              shadow_stack[stack_top].rms,
-//              shadow_stack[stack_top].cost
-//    );
+    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
+              shadow_stack[stack_top].funcId,
+              shadow_stack[stack_top].rms,
+              shadow_stack[stack_top].cost
+    );
 
-    char str[50];
-    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
-            shadow_stack[stack_top].funcId,
-            shadow_stack[stack_top].rms,
-            shadow_stack[stack_top].cost);
-    strcat(log_str, str);
+//    char str[50];
+//    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
+//            shadow_stack[stack_top].funcId,
+//            shadow_stack[stack_top].rms,
+//            shadow_stack[stack_top].cost);
+//    strcat(log_str, str);
 
     if (stack_top >= 1) {
 
@@ -267,9 +267,69 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 
     } else {
         // log result to memory.
-        void *ptr = _init_share_mem();
-        strcpy((char *) ptr, log_str);
+//        void *ptr = _init_share_mem();
+//        strcpy((char *) ptr, log_str);
         destroy_page_table();
     }
 
+}
+
+//===========================================================================
+//=  Function to generate geometrically distributed random variables        =
+//=    - Input:  Probability of success p                                   =
+//=    - Output: Returns with geometrically distributed random variable     =
+//===========================================================================
+int aprof_geo(int iRate) {
+    double p = 1 / (double) iRate;
+    double z;                     // Uniform random number (0 < z < 1)
+    double geo_value;             // Computed geometric value to be returned
+
+    do {
+        // Pull a uniform random number (0 < z < 1)
+        do {
+            z = rand_val(0);
+        } while ((z == 0) || (z == 1));
+
+        // Compute geometric random variable using inversion method
+        geo_value = (int) (log(z) / log(1.0 - p)) + 1;
+    } while ((int) geo_value == old_value + 1);
+
+    old_value = (int) geo_value;
+    return old_value;
+}
+
+//=========================================================================
+//= Multiplicative LCG for generating uniform(0.0, 1.0) random numbers    =
+//=   - x_n = 7^5*x_(n-1)mod(2^31 - 1)                                    =
+//=   - With x seeded to 1 the 10000th x value should be 1043618065       =
+//=   - From R. Jain, "The Art of Computer Systems Performance Analysis," =
+//=     John Wiley & Sons, 1991. (Page 443, Figure 26.2)                  =
+//=========================================================================
+static double rand_val(int seed) {
+    const long a = 16807;  // Multiplier
+    const long m = 2147483647;  // Modulus
+    const long q = 127773;  // m div a
+    const long r = -2836;  // m mod a
+    static long x;               // Random int value
+    long x_div_q;         // x divided by q
+    long x_mod_q;         // x modulo q
+    long x_new;           // New x value
+
+    // Set the seed if argument is non-zero and then return zero
+    if (seed > 0) {
+        x = seed;
+        return (0.0);
+    }
+
+    // RNG using integer arithmetic
+    x_div_q = x / q;
+    x_mod_q = x % q;
+    x_new = (a * x_mod_q) - (r * x_div_q);
+    if (x_new > 0)
+        x = x_new;
+    else
+        x = x_new + m;
+
+    // Return a random value between 0.0 and 1.0
+    return ((double) x / m);
 }

@@ -111,6 +111,29 @@ bool IsIgnoreFunc(Function *F) {
     return false;
 }
 
+
+bool IsClonedFunc(Function *F) {
+
+    if (!F) {
+        return false;
+    }
+
+    std::string funcName = F->getName().str();
+
+    // FIXME::
+    if (funcName == "main") {
+        return true;
+    }
+
+    if (funcName.length() > 7 &&
+            funcName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+        return true;
+    }
+
+    return false;
+
+}
+
 int GetBBCostNum(BasicBlock *BB) {
 
     MDNode *Node;

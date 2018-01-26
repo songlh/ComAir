@@ -23,13 +23,15 @@ struct PrepareAprof : public ModulePass {
 
     virtual bool runOnModule(Module &M);
 
-    void SetupInit(Module *);
-
     void SetupTypes(Module *);
 
     void SetupConstants(Module *);
 
     void SetupGlobals(Module *);
+
+    void SetupFunctions(Module *);
+
+    void SetupInit(Module *);
 
     BinaryOperator *CreateIfElseBlock(Function *, Module *,  std::vector<BasicBlock *> &);
 
@@ -39,18 +41,27 @@ struct PrepareAprof : public ModulePass {
 
     void AddSwitcher(Function *);
 
+    void CloneFunctionCalled();
+
     // type
     IntegerType * LongType;
+    IntegerType * IntType;
 
     //global
     GlobalVariable *Switcher;
+    GlobalVariable *GeoRate;
 
     //constant
+    ConstantInt *ConstantInt0;
+    ConstantInt *ConstantBigInt;
     ConstantInt *ConstantLong0;
     ConstantInt *ConstantLong1;
 
     // constant  -1
-    ConstantInt *ConstantLongN1;
+    ConstantInt *ConstantIntN1;
+
+    // function geo
+    Function *geo;
 };
 
 

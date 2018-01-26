@@ -14,6 +14,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "Common/Constant.h"
+#include "Common/Helper.h"
 #include "PrepareAprof/PrePareAprof.h"
 
 
@@ -63,6 +64,44 @@ void SplitReturnBlock(Function *pFunction) {
     }
 }
 
+
+bool IsNeedChangeCallee(Function *F) {
+
+    if (F->isDeclaration() || F->isIntrinsic())
+        return false;
+
+    if (F->getName().str() == "main")
+        return false;
+
+    BasicBlock *BB = &*(F->begin());
+
+    if (!BB)
+        return false;
+
+    return true;
+
+}
+
+Function *SearchFunctionByName(std::set<Function *> FuncSet,
+                               std::string FuncName) {
+
+    long nameLength = FuncName.length();
+
+    for (auto *F: FuncSet) {
+
+        std::string _Name = F->getName().str();
+
+        if (_Name.length() >= (7 + nameLength) &&
+            _Name.substr(7, nameLength) == FuncName) {
+
+            return F;
+        }
+    }
+
+    return NULL;
+}
+
+
 char PrepareAprof::ID = 0;
 
 void PrepareAprof::getAnalysisUsage(AnalysisUsage &AU) const {
@@ -80,22 +119,44 @@ PrepareAprof::PrepareAprof() : ModulePass(ID) {
 
 void PrepareAprof::SetupTypes(Module *pModule) {
     this->LongType = IntegerType::get(pModule->getContext(), 64);
+    this->IntType = IntegerType::get(pModule->getContext(), 32);
 }
 
-
 void PrepareAprof::SetupConstants(Module *pModule) {
+    this->ConstantInt0 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("0"), 10));
+    this->ConstantBigInt = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("100"), 10));
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
     this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
-    this->ConstantLongN1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("-1"), 10));
+    this->ConstantIntN1 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("-1"), 10));
 }
 
 void PrepareAprof::SetupGlobals(Module *pModule) {
     assert(pModule->getGlobalVariable("Switcher") == NULL);
-    this->Switcher = new GlobalVariable(*pModule, this->LongType,
+    this->Switcher = new GlobalVariable(*pModule, this->IntType,
                                         false, GlobalValue::ExternalLinkage,
                                         0, "Switcher");
-    this->Switcher->setAlignment(8);
-    this->Switcher->setInitializer(this->ConstantLong0);
+    this->Switcher->setAlignment(4);
+    this->Switcher->setInitializer(this->ConstantInt0);
+
+    assert(pModule->getGlobalVariable("GeoRate") == NULL);
+    this->GeoRate = new GlobalVariable(*pModule, this->IntType,
+                                        false, GlobalValue::ExternalLinkage,
+                                        0, "GeoRate");
+    this->GeoRate->setAlignment(4);
+    this->GeoRate->setInitializer(this->ConstantBigInt);
+
+}
+
+void PrepareAprof::SetupFunctions(Module *pModule) {
+    std::vector<Type *> ArgTypes;
+
+    // aprof_geo
+    ArgTypes.push_back(this->IntType);
+    FunctionType *AprofGeoType = FunctionType::get(this->IntType, ArgTypes, false);
+    this->geo = Function::Create
+            (AprofGeoType, GlobalValue::ExternalLinkage, "aprof_geo", this->pModule);
+    this->geo->setCallingConv(CallingConv::C);
+    ArgTypes.clear();
 
 }
 
@@ -125,7 +186,7 @@ BinaryOperator *PrepareAprof::CreateIfElseBlock(
 
     pTerminator = pEntryBlock->getTerminator();
     pLoad1 = new LoadInst(this->Switcher, "", false, pTerminator);
-    pLoad1->setAlignment(8);
+    pLoad1->setAlignment(4);
 
     pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_EQ, pLoad1, this->ConstantLong0, "");
     pBranch = BranchInst::Create(pRawEntryBlock, pElseBlock, pCmp);
@@ -335,109 +396,189 @@ void PrepareAprof::CloneTargetFunction(
     }
 }
 
-
 void PrepareAprof::SetupInit(Module *pModule) {
     // all set up operation
     this->pModule = pModule;
     SetupTypes(pModule);
     SetupConstants(pModule);
     SetupGlobals(pModule);
+    SetupFunctions(pModule);
+
 }
 
-
 void PrepareAprof::AddSwitcher(Function *F) {
-     SplitReturnBlock(F);
-     std::vector<BasicBlock *> vecAdd;
-     BinaryOperator *pAdd = CreateIfElseBlock(F, this->pModule, vecAdd);
-
-     ValueToValueMapTy VMap;
-     CloneTargetFunction(F, vecAdd, VMap);
+//     SplitReturnBlock(F);
+//     std::vector<BasicBlock *> vecAdd;
+//     BinaryOperator *pAdd = CreateIfElseBlock(F, this->pModule, vecAdd);
+//
+//     ValueToValueMapTy VMap;
+//     CloneTargetFunction(F, vecAdd, VMap);
 
     /* ---- alternative implementation ---- */
-//    ValueToValueMapTy newVMap;
-//    ValueToValueMapTy rawVMap;
-//    LoadInst *pLoad1 = NULL;
-//    ICmpInst *pCmp = NULL;
-//
-//    // clone new function
-//    Function *newF = CloneFunction(F, newVMap);
-//    // clone raw function
-//    Function *rawF = CloneFunction(F, rawVMap);
-//
-//    // the prefix is used to
-//    string name = newF->getName().str();
-//    name = CLONE_FUNCTION_PREFIX + name;
-//    newF->setName(name);
-//
-//    // delete all current basic blocks;
-//    F->dropAllReferences();
-//
-//    // create all need block!
-//    BasicBlock *newEntry = BasicBlock::Create(this->pModule->getContext(),
-//                                              "newEntry", F, 0);
-//
-//    BasicBlock *label_if_then = BasicBlock::Create(this->pModule->getContext(),
-//                                                   "if.then", F, 0);
-//
-//    BasicBlock *label_if_else = BasicBlock::Create(this->pModule->getContext(),
-//                                                   "if.else", F, 0);
-//
-//    // load switcher
-//    pLoad1 = new LoadInst(this->Switcher, "", false, newEntry);
-//    pLoad1->setAlignment(8);
-//
-//    // create if (switcher == 0)
-//    pCmp = new ICmpInst(*newEntry, ICmpInst::ICMP_EQ, pLoad1, this->ConstantLong0, "");
-//    BranchInst::Create(label_if_then, label_if_else, pCmp, newEntry);
-//
-//    // collect all args to pass to newF and rawF.
-//    vector<Value *> callArgs;
-//    for (Function::arg_iterator k = F->arg_begin(), ke = F->arg_end(); k != ke; ++k)
-//        callArgs.push_back(k);
-//
-//    // Block if.then: insert call new function in if.then
-//    CallInst *oneCall = CallInst::Create(newF, callArgs,
-//                                         (F->getReturnType()->isVoidTy()) ? "" : "theCall",
-//                                         label_if_then);
-//    oneCall->setTailCall(true);
-//
-//    // TODO: add call geo random a int num and store to switcher
-//
-//    if (F->getReturnType()->isVoidTy())
-//        ReturnInst::Create(this->pModule->getContext(), label_if_then);
-//    else
-//        ReturnInst::Create(this->pModule->getContext(), oneCall, label_if_then);
-//
-//    // Block if.else: insert switcher-- and call raw function in if.else
-//    LoadInst *loadInst_1 =  new LoadInst(this->Switcher, "", false, label_if_else);
-//    loadInst_1->setAlignment(8);
-//
-//    BinaryOperator* int32_dec = BinaryOperator::Create(
-//            Instruction::Add, loadInst_1,
-//            this->ConstantLongN1, "dec", label_if_else);
-//
-//    StoreInst* void_35 = new StoreInst(
-//            int32_dec, this->Switcher,
-//            false, label_if_else);
-//    void_35->setAlignment(4);
-//
-//    oneCall = CallInst::Create(
-//            rawF, callArgs,
-//            (F->getReturnType()->isVoidTy()) ? "" : "theCall",
-//             label_if_else);
-//    oneCall->setTailCall(true);
-//
-//    if (F->getReturnType()->isVoidTy())
-//        ReturnInst::Create(this->pModule->getContext(), label_if_else);
-//    else
-//        ReturnInst::Create(this->pModule->getContext(), oneCall, label_if_else);
+    ValueToValueMapTy newVMap;
+    ValueToValueMapTy rawVMap;
+    LoadInst *pLoad1 = NULL;
+    ICmpInst *pCmp = NULL;
+
+    // clone new function
+    Function *newF = CloneFunction(F, newVMap);
+    // clone raw function
+    Function *rawF = CloneFunction(F, rawVMap);
+
+    // the prefix is used to
+    string name = newF->getName().str();
+    name = CLONE_FUNCTION_PREFIX + name;
+    newF->setName(name);
+
+    // delete all current basic blocks;
+    F->dropAllReferences();
+
+    // create all need block!
+    BasicBlock *newEntry = BasicBlock::Create(this->pModule->getContext(),
+                                              "newEntry", F, 0);
+
+    BasicBlock *label_if_then = BasicBlock::Create(this->pModule->getContext(),
+                                                   "if.then", F, 0);
+
+    BasicBlock *label_if_else = BasicBlock::Create(this->pModule->getContext(),
+                                                   "if.else", F, 0);
+
+    // load switcher
+    pLoad1 = new LoadInst(this->Switcher, "", false, newEntry);
+    pLoad1->setAlignment(4);
+
+    // create if (switcher == 0)
+    pCmp = new ICmpInst(*newEntry, ICmpInst::ICMP_EQ, pLoad1, this->ConstantInt0, "");
+    BranchInst::Create(label_if_then, label_if_else, pCmp, newEntry);
+
+    // collect all args to pass to newF and rawF.
+    vector<Value *> callArgs;
+    for (Function::arg_iterator k = F->arg_begin(), ke = F->arg_end(); k != ke; ++k)
+        callArgs.push_back(k);
+
+    // Block if.then: insert call new function in if.then
+    CallInst *oneCall = CallInst::Create(newF, callArgs,
+                                         (F->getReturnType()->isVoidTy()) ? "" : "theCall",
+                                         label_if_then);
+    oneCall->setTailCall(false);
+
+    // call geo random a int num and store to switcher
+    pLoad1 = new LoadInst(this->GeoRate, "", false, label_if_then);
+    pLoad1->setAlignment(4);
+
+    std::vector<Value *> geo_params;
+    geo_params.push_back(pLoad1);
+
+    CallInst *callGeoInst = CallInst::Create(this->geo, geo_params, "", label_if_then);
+    callGeoInst->setCallingConv(CallingConv::C);
+    callGeoInst->setTailCall(true);
+    new StoreInst(callGeoInst, this->Switcher, false, label_if_then);
+
+    // return
+    if (F->getReturnType()->isVoidTy())
+        ReturnInst::Create(this->pModule->getContext(), label_if_then);
+    else
+        ReturnInst::Create(this->pModule->getContext(), oneCall, label_if_then);
+
+    // Block if.else: insert switcher-- and call raw function in if.else
+    LoadInst *loadInst_1 = new LoadInst(this->Switcher, "", false, label_if_else);
+    loadInst_1->setAlignment(8);
+
+    BinaryOperator *int32_dec = BinaryOperator::Create(
+            Instruction::Add, loadInst_1,
+            this->ConstantIntN1, "dec", label_if_else);
+
+    StoreInst *void_35 = new StoreInst(
+            int32_dec, this->Switcher,
+            false, label_if_else);
+    void_35->setAlignment(4);
+
+    oneCall = CallInst::Create(
+            rawF, callArgs,
+            (F->getReturnType()->isVoidTy()) ? "" : "theCall",
+            label_if_else);
+    oneCall->setTailCall(true);
+
+    if (F->getReturnType()->isVoidTy())
+        ReturnInst::Create(this->pModule->getContext(), label_if_else);
+    else
+        ReturnInst::Create(this->pModule->getContext(), oneCall, label_if_else);
+
+}
+
+void PrepareAprof::CloneFunctionCalled() {
+
+    std::vector<Function *> WaitForChangeCalled;
+
+    for (Module::iterator FI = this->pModule->begin();
+         FI != this->pModule->end(); FI++) {
+
+        Function *F = &*FI;
+        string funcName = F->getName().str();
+
+        if (funcName.length() > 7 &&
+            funcName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+            WaitForChangeCalled.push_back(F);
+
+        }
+    }
+
+    // use to search target function!
+    std::set<Function *> tempVector;
+    tempVector.insert(WaitForChangeCalled.begin(),
+                      WaitForChangeCalled.end());
+
+    for (auto *Func:WaitForChangeCalled) {
+
+        for (Function::iterator BI = Func->begin();
+             BI != Func->end(); BI++) {
+
+            BasicBlock *BB = &*BI;
+
+            for (BasicBlock::iterator II = BB->begin();
+                 II != BB->end(); II++) {
+
+                Instruction *Inst = &*II;
+
+                switch (Inst->getOpcode()) {
+
+                    case Instruction::Call: {
+                        CallSite ci(Inst);
+                        Function *Callee = dyn_cast<Function>(
+                                ci.getCalledValue()->stripPointerCasts());
+
+                        if (IsNeedChangeCallee(Callee)) {
+                            CallInst *pCall = dyn_cast<CallInst>(Inst);
+
+                            std::string funcName = Callee->getName().str();
+                            Function *targetFunc = SearchFunctionByName(
+                                    tempVector, funcName);
+
+                            if (targetFunc) {
+                                pCall->setCalledFunction(targetFunc);
+                            } else {
+                                pCall->dump();
+                                errs() << "There is error find target function!" << "\n";
+                            }
+                        }
+
+                        break;
+                    }
+
+                }
+
+            }
+
+        }
+    }
 
 }
 
 bool PrepareAprof::runOnModule(Module &M) {
-    // setup init
+    /* setup init */
     SetupInit(&M);
 
+    /* --- clone function and add switcher */
     std::vector<Function *> NeedClone;
 
     for (Module::iterator FI = M.begin(); FI != M.end(); FI++) {
@@ -446,6 +587,10 @@ bool PrepareAprof::runOnModule(Module &M) {
 
         if (F->isDeclaration() || F->isIntrinsic())
             continue;
+
+        if (F->getSection().str() == ".text.startup") {
+            continue;
+        }
 
         if (F->getName().str() == "main")
             continue;
@@ -457,6 +602,11 @@ bool PrepareAprof::runOnModule(Module &M) {
     for (auto *Func: NeedClone) {
         AddSwitcher(Func);
     }
+    /* ---- end ---- */
+
+    /* ---- change clone function callees ---- */
+    CloneFunctionCalled();
+    /* ---- end ---- */
 
     return false;
 }

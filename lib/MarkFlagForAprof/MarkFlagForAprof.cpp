@@ -270,7 +270,7 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
 
         Function *Func = &*FI;
 
-        if (IsIgnoreFunc(Func)) {
+        if (!IsClonedFunc(Func)) {
             continue;
         }
 

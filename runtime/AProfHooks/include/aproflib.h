@@ -73,7 +73,7 @@ void aprof_return(unsigned long numCost, unsigned long rms);
 
 
 //----- sampling generator---------
-long aprof_geo(long iRate);            // Returns a geometric random variable
+int aprof_geo(int iRate);            // Returns a geometric random variable
 static double rand_val(int seed);    // Jain's RNG
 
 #endif

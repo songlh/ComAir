@@ -17,6 +17,8 @@ int GetInstructionInsertFlag(Instruction *II);
 
 bool IsIgnoreFunc(Function *F);
 
+bool IsClonedFunc(Function *F);
+
 int GetBBCostNum(BasicBlock *BB);
 
 

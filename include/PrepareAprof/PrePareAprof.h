@@ -49,13 +49,16 @@ struct PrepareAprof : public ModulePass {
 
     //global
     GlobalVariable *Switcher;
+    GlobalVariable *GeoRate;
 
     //constant
+    ConstantInt *ConstantInt0;
+    ConstantInt *ConstantBigInt;
     ConstantInt *ConstantLong0;
     ConstantInt *ConstantLong1;
 
     // constant  -1
-    ConstantInt *ConstantLongN1;
+    ConstantInt *ConstantIntN1;
 
     // function geo
     Function *geo;

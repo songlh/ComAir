@@ -14,6 +14,7 @@
 #include "llvm/Transforms/Utils/Cloning.h"
 
 #include "Common/Constant.h"
+#include "Common/Helper.h"
 #include "PrepareAprof/PrePareAprof.h"
 
 
@@ -122,18 +123,27 @@ void PrepareAprof::SetupTypes(Module *pModule) {
 }
 
 void PrepareAprof::SetupConstants(Module *pModule) {
+    this->ConstantInt0 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("0"), 10));
+    this->ConstantBigInt = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("100"), 10));
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
     this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
-    this->ConstantLongN1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("-1"), 10));
+    this->ConstantIntN1 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("-1"), 10));
 }
 
 void PrepareAprof::SetupGlobals(Module *pModule) {
     assert(pModule->getGlobalVariable("Switcher") == NULL);
-    this->Switcher = new GlobalVariable(*pModule, this->LongType,
+    this->Switcher = new GlobalVariable(*pModule, this->IntType,
                                         false, GlobalValue::ExternalLinkage,
                                         0, "Switcher");
-    this->Switcher->setAlignment(8);
-    this->Switcher->setInitializer(this->ConstantLong0);
+    this->Switcher->setAlignment(4);
+    this->Switcher->setInitializer(this->ConstantInt0);
+
+    assert(pModule->getGlobalVariable("GeoRate") == NULL);
+    this->GeoRate = new GlobalVariable(*pModule, this->IntType,
+                                        false, GlobalValue::ExternalLinkage,
+                                        0, "GeoRate");
+    this->GeoRate->setAlignment(4);
+    this->GeoRate->setInitializer(this->ConstantBigInt);
 
 }
 
@@ -141,8 +151,8 @@ void PrepareAprof::SetupFunctions(Module *pModule) {
     std::vector<Type *> ArgTypes;
 
     // aprof_geo
-    ArgTypes.push_back(this->LongType);
-    FunctionType *AprofGeoType = FunctionType::get(this->LongType, ArgTypes, false);
+    ArgTypes.push_back(this->IntType);
+    FunctionType *AprofGeoType = FunctionType::get(this->IntType, ArgTypes, false);
     this->geo = Function::Create
             (AprofGeoType, GlobalValue::ExternalLinkage, "aprof_geo", this->pModule);
     this->geo->setCallingConv(CallingConv::C);
@@ -176,7 +186,7 @@ BinaryOperator *PrepareAprof::CreateIfElseBlock(
 
     pTerminator = pEntryBlock->getTerminator();
     pLoad1 = new LoadInst(this->Switcher, "", false, pTerminator);
-    pLoad1->setAlignment(8);
+    pLoad1->setAlignment(4);
 
     pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_EQ, pLoad1, this->ConstantLong0, "");
     pBranch = BranchInst::Create(pRawEntryBlock, pElseBlock, pCmp);
@@ -435,10 +445,10 @@ void PrepareAprof::AddSwitcher(Function *F) {
 
     // load switcher
     pLoad1 = new LoadInst(this->Switcher, "", false, newEntry);
-    pLoad1->setAlignment(8);
+    pLoad1->setAlignment(4);
 
     // create if (switcher == 0)
-    pCmp = new ICmpInst(*newEntry, ICmpInst::ICMP_EQ, pLoad1, this->ConstantLong0, "");
+    pCmp = new ICmpInst(*newEntry, ICmpInst::ICMP_EQ, pLoad1, this->ConstantInt0, "");
     BranchInst::Create(label_if_then, label_if_else, pCmp, newEntry);
 
     // collect all args to pass to newF and rawF.
@@ -453,8 +463,8 @@ void PrepareAprof::AddSwitcher(Function *F) {
     oneCall->setTailCall(false);
 
     // call geo random a int num and store to switcher
-    pLoad1 = new LoadInst(this->Switcher, "", false, label_if_then);
-    pLoad1->setAlignment(8);
+    pLoad1 = new LoadInst(this->GeoRate, "", false, label_if_then);
+    pLoad1->setAlignment(4);
 
     std::vector<Value *> geo_params;
     geo_params.push_back(pLoad1);
@@ -476,7 +486,7 @@ void PrepareAprof::AddSwitcher(Function *F) {
 
     BinaryOperator *int32_dec = BinaryOperator::Create(
             Instruction::Add, loadInst_1,
-            this->ConstantLongN1, "dec", label_if_else);
+            this->ConstantIntN1, "dec", label_if_else);
 
     StoreInst *void_35 = new StoreInst(
             int32_dec, this->Switcher,
@@ -577,6 +587,10 @@ bool PrepareAprof::runOnModule(Module &M) {
 
         if (F->isDeclaration() || F->isIntrinsic())
             continue;
+
+        if (F->getSection().str() == ".text.startup") {
+            continue;
+        }
 
         if (F->getName().str() == "main")
             continue;

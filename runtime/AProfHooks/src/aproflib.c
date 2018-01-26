@@ -25,7 +25,7 @@ struct stack_elem shadow_stack[200];
 int stack_top = -1;
 
 // used to sampling
-static long old_value = -1;
+static int old_value = -1;
 
 
 void init_page_table() {
@@ -148,7 +148,7 @@ void destroy_page_table() {
 
 void logger_init() {
     const char *FILENAME = "aprof_logger.txt";
-    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int LEVEL = 2;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, LEVEL, QUIET);
@@ -170,11 +170,10 @@ char *_init_share_mem() {
 
 int aprof_init() {
     // if we do not need debug, we should close this.
-//    logger_init();
+    logger_init();
 //    _init_share_mem();
     init_page_table();
 }
-
 
 void aprof_write(void *memory_addr, unsigned int length) {
     unsigned long start_addr = (unsigned long) memory_addr;
@@ -223,7 +222,6 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
 }
 
-
 void aprof_increment_rms() {
     shadow_stack[stack_top].rms++;
 
@@ -242,24 +240,23 @@ void aprof_call_before(int funcId) {
 
 }
 
-
 void aprof_return(unsigned long numCost, unsigned long rms) {
 
     shadow_stack[stack_top].cost += numCost;
     shadow_stack[stack_top].rms += rms;
 
-//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-//              shadow_stack[stack_top].funcId,
-//              shadow_stack[stack_top].rms,
-//              shadow_stack[stack_top].cost
-//    );
+    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
+              shadow_stack[stack_top].funcId,
+              shadow_stack[stack_top].rms,
+              shadow_stack[stack_top].cost
+    );
 
-    char str[50];
-    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
-            shadow_stack[stack_top].funcId,
-            shadow_stack[stack_top].rms,
-            shadow_stack[stack_top].cost);
-    strcat(log_str, str);
+//    char str[50];
+//    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
+//            shadow_stack[stack_top].funcId,
+//            shadow_stack[stack_top].rms,
+//            shadow_stack[stack_top].cost);
+//    strcat(log_str, str);
 
     if (stack_top >= 1) {
 
@@ -270,8 +267,8 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 
     } else {
         // log result to memory.
-        void *ptr = _init_share_mem();
-        strcpy((char *) ptr, log_str);
+//        void *ptr = _init_share_mem();
+//        strcpy((char *) ptr, log_str);
         destroy_page_table();
     }
 
@@ -282,7 +279,7 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 //=    - Input:  Probability of success p                                   =
 //=    - Output: Returns with geometrically distributed random variable     =
 //===========================================================================
-long aprof_geo(long iRate) {
+int aprof_geo(int iRate) {
     double p = 1 / (double) iRate;
     double z;                     // Uniform random number (0 < z < 1)
     double geo_value;             // Computed geometric value to be returned
@@ -297,9 +294,8 @@ long aprof_geo(long iRate) {
         geo_value = (int) (log(z) / log(1.0 - p)) + 1;
     } while ((int) geo_value == old_value + 1);
 
-
-    old_value = (long) geo_value;
-    return (geo_value);
+    old_value = (int) geo_value;
+    return old_value;
 }
 
 //=========================================================================

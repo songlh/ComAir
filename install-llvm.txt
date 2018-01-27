@@ -1,0 +1,41 @@
+﻿0. Prerequisite
+sudo apt-get install bison flex libboost-dev texinfo
+
+1. Build binutils
+git clone git://sourceware.org/git/binutils-gdb.git
+cd binutils-gdb/
+mkdir build
+cd build
+../configure --prefix=${INSTALL} --enable-gold --enable-plugins --disable-werror
+make all-gold all-binutils
+make install-gold install-binutils
+
+
+2. How to build llvm
+download llvm and clang source code
+llvm: http://releases.llvm.org/5.0.0/llvm-5.0.0.src.tar.xz
+clang: http://releases.llvm.org/5.0.0/cfe-5.0.0.src.tar.xz
+
+
+mv cfe-5.0.0.src llvm-5.0.0.src/tools/clang
+cd llvm-5.0.0.src
+mkdir build
+cd build
+cmake -DLLVM_BINUTILS_INCDIR=${PATH_TO_BINUTIL_SOURCE}/include -DCMAKE_INSTALL_PREFIX=${SAME_PATH_AS_BINUTILS}  ${PATH_TO_LLVM_SOURCE_ROOT}
+
+
+cmake --build .
+cmake --build . --target install
+
+
+cd ${INSTALL}/lib
+mkdir bfd-plugins
+cp libLTO.so LLVMgold.so ./bfd-plugins
+cd ${INSTALL}/bin
+ln -s ./ld.gold ./ld
+export PATH=${INSTALL}/bin:$PATH
+
+
+3. Test
+Try command in Example of link time optimization
+In http://llvm.org/docs/GoldPlugin.html

@@ -21,6 +21,7 @@ unsigned long *prev_pL3 = NULL;
 
 char log_str[BUFFERSIZE];
 unsigned long count = 0;
+unsigned long sampling_count = 0;
 struct stack_elem shadow_stack[200];
 int stack_top = -1;
 
@@ -295,6 +296,9 @@ int aprof_geo(int iRate) {
     } while ((int) geo_value == old_value + 1);
 
     old_value = (int) geo_value;
+    // log sampling call chain number
+    sampling_count = count - sampling_count;
+    log_fatal("sampling count: %ld;", sampling_count);
     return old_value;
 }
 

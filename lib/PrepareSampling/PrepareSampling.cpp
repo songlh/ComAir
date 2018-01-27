@@ -27,6 +27,11 @@ static RegisterPass<PrepareSampling> X(
         "prepare for sampling", true, true);
 
 
+static cl::opt<int> SamplingRate("samling-rate",
+                               cl::desc("The rate of sampling."),
+                               cl::init(100));
+
+
 /* ---- local function ---- */
 
 void GetAllReturnSite(Function *pFunction, set<ReturnInst *> &setRet) {
@@ -144,7 +149,8 @@ void PrepareSampling::SetupTypes(Module *pModule) {
 
 void PrepareSampling::SetupConstants(Module *pModule) {
     this->ConstantInt0 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("0"), 10));
-    this->ConstantBigInt = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("100"), 10));
+    this->ConstantSamplingRate = ConstantInt::get(pModule->getContext(),
+                                            APInt(32, StringRef(std::to_string(SamplingRate)), 10));
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
     this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
     this->ConstantIntN1 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("-1"), 10));
@@ -163,7 +169,7 @@ void PrepareSampling::SetupGlobals(Module *pModule) {
                                        false, GlobalValue::ExternalLinkage,
                                        0, "GeoRate");
     this->GeoRate->setAlignment(4);
-    this->GeoRate->setInitializer(this->ConstantBigInt);
+    this->GeoRate->setInitializer(this->ConstantSamplingRate);
 
 }
 

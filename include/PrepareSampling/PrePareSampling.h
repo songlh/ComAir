@@ -53,7 +53,7 @@ struct PrepareSampling : public ModulePass {
 
     //constant
     ConstantInt *ConstantInt0;
-    ConstantInt *ConstantBigInt;
+    ConstantInt *ConstantSamplingRate;
     ConstantInt *ConstantLong0;
     ConstantInt *ConstantLong1;
 

@@ -1,6 +1,8 @@
 #ifndef COMAIR_APROFHOOKPASS_H
 #define COMAIR_APROFHOOKPASS_H
 
+#include <fstream>
+
 #include "llvm/Pass.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -34,19 +36,19 @@ struct AprofHook : public ModulePass {
 
     void InstrumentCostUpdater(BasicBlock *);
 
-    void InsertAprofInit(Instruction *);
+    void InstrumentInit(Instruction *);
 
-    void InsertAprofHooks(Function *);
+    void InstrumentHooks(Function *);
 
-    void InsertAprofWrite(Value *, Instruction *);
+    void InstrumentWrite(Value *, Instruction *);
 
-    void InsertAprofRead(Value *, Instruction *);
+    void InstrumentRead(Value *, Instruction *);
 
-    void InsertAprofAlloc(Value *, Instruction *);
+    void InstrumentAlloc(Value *, Instruction *);
 
-    void InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst);
+    void InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst);
 
-    void InsertAprofReturn(Instruction *m, bool);
+    void InstrumentReturn(Instruction *m, bool);
 
     void InstrumentCostUpdater(Function *pFunction);
 
@@ -85,10 +87,14 @@ struct AprofHook : public ModulePass {
     ConstantInt *ConstantLong1;
     /* ********** */
 
-    /* */
+    /* Alloc Inst */
     AllocaInst *BBAllocInst;
     AllocaInst *RmsAllocInst;
     /* **** */
+
+    /* OutPut File */
+    ofstream funNameIDFile;
+    /* */
 
 };
 

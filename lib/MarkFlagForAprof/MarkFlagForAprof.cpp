@@ -15,10 +15,17 @@ using namespace std;
 using namespace llvm;
 
 static RegisterPass<MarkFlagForAprof> X(
-        "mark-flag-aprof", "mark flags for insert aprof functions", true, true);
+        "mark-flags",
+        "mark flags for instrumenting aprof functions",
+        false, false);
 
 
-/* local function */
+static cl::opt<int> isSampling("is-sampling",
+                              cl::desc("Whether to perform sampling."),
+                              cl::init(0));
+
+
+/* local functions */
 
 bool IsInBasicBlock(int bb_id,
                     std::map<int, std::set<Value *>> VisitedValues,
@@ -98,7 +105,7 @@ bool isSuccAllSinglePredecessor(BasicBlock *BB) {
 
 }
 
-/* */
+/* end local functions */
 
 char MarkFlagForAprof::ID = 0;
 
@@ -120,7 +127,7 @@ void MarkFlagForAprof::setupInit(Module *M) {
     setupTypes();
 }
 
-void MarkFlagForAprof::markInstFlag(Instruction *Inst, int Flag) {
+void MarkFlagForAprof::MarkFlag(Instruction *Inst, int Flag) {
     MDBuilder MDHelper(this->pModule->getContext());
     Constant *InsID = ConstantInt::get(this->IntType, Flag);
     SmallVector<Metadata *, 1> Vals;
@@ -153,7 +160,8 @@ void MarkFlagForAprof::MarkFlag(BasicBlock *BB, int Num) {
 
 }
 
-void MarkFlagForAprof::MarkBBFlag(Function *F) {
+void MarkFlagForAprof::MarkBBUpdateFlag(Function *F) {
+
     std::stack<BasicBlock *> VisitedStack;
     std::map<BasicBlock *, int> MarkedMap;
     std::set<BasicBlock *> VisitedSet;
@@ -270,11 +278,15 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
 
         Function *Func = &*FI;
 
-        if (!IsClonedFunc(Func)) {
+        if (isSampling == 1) {
+            if (!IsClonedFunc(Func)) {
+                continue;
+            }
+        } else if (IsIgnoreFunc(Func)) {
             continue;
         }
 
-        MarkBBFlag(Func);
+        MarkBBUpdateFlag(Func);
 
         VisitedValues.clear();
 
@@ -297,14 +309,16 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
                 Instruction *Inst = &*II;
 
                 switch (Inst->getOpcode()) {
+
                     case Instruction::Alloca: {
                         if (!IsInBasicBlock(bb_id, VisitedValues, Inst)) {
-                            markInstFlag(Inst, READ);
+                            MarkFlag(Inst, READ);
                         }
                         VisitedValues = UpdateVisitedMap(
                                 VisitedValues, bb_id, Inst);
                         break;
                     }
+
                     case Instruction::Call: {
                         // clear current VisitedValues.second
                         CallSite ci(Inst);
@@ -320,24 +334,27 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
                         }
                         break;
                     }
+
                     case Instruction::Load: {
                         Value *firstOp = Inst->getOperand(0);
                         if (!IsInBasicBlock(bb_id, VisitedValues, firstOp)) {
-                            markInstFlag(Inst, READ);
+                            MarkFlag(Inst, READ);
                         }
                         VisitedValues = UpdateVisitedMap(
                                 VisitedValues, bb_id, firstOp);
                         break;
                     }
+
                     case Instruction::Store: {
                         Value *secondOp = Inst->getOperand(1);
                         if (!IsInBasicBlock(bb_id, VisitedValues, secondOp)) {
-                            markInstFlag(Inst, WRITE);
+                            MarkFlag(Inst, WRITE);
                         }
                         VisitedValues = UpdateVisitedMap(
                                 VisitedValues, bb_id, secondOp);
                         break;
                     }
+
                 }
             }
         }

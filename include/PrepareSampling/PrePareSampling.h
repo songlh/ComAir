@@ -11,11 +11,11 @@
 using namespace llvm;
 using namespace std;
 
-struct PrepareAprof : public ModulePass {
+struct PrepareSampling : public ModulePass {
 
     static char ID;
 
-    PrepareAprof();
+    PrepareSampling();
 
     Module *pModule;
 

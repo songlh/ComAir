@@ -17,13 +17,25 @@ using namespace std;
 
 
 static RegisterPass<AprofHook> X(
-        "algo-profiling",
+        "instrument-hooks",
         "profiling algorithmic complexity",
-        true, true);
+        false, false);
+
 
 static cl::opt<int> onlyBBCount("only-bb-count",
                                 cl::desc("only insert bb count."),
                                 cl::init(0));
+
+
+static cl::opt<int> isSampling("is-sampling",
+                                cl::desc("Whether to perform sampling"),
+                                cl::init(0));
+
+
+static cl::opt<std::string> strFileName(
+        "strFileName",
+        cl::desc("The name of File to store system library"), cl::Optional,
+        cl::value_desc("strFileName"));
 
 /* local function */
 
@@ -131,7 +143,7 @@ void AprofHook::SetupFunctions() {
 
 }
 
-void AprofHook::InsertAprofInit(Instruction *firstInst) {
+void AprofHook::InstrumentInit(Instruction *firstInst) {
 
     CallInst *aprof_init_call = CallInst::Create(this->aprof_init, "", firstInst);
     aprof_init_call->setCallingConv(CallingConv::C);
@@ -181,7 +193,7 @@ void AprofHook::InstrumentCostUpdater(Function *pFunction) {
 
 }
 
-void AprofHook::InsertAprofWrite(Value *var, Instruction *BeforeInst) {
+void AprofHook::InstrumentWrite(Value *var, Instruction *BeforeInst) {
 
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType()->getContainedType(0);
@@ -206,7 +218,7 @@ void AprofHook::InsertAprofWrite(Value *var, Instruction *BeforeInst) {
 
 }
 
-void AprofHook::InsertAprofRead(Value *var, Instruction *BeforeInst) {
+void AprofHook::InstrumentRead(Value *var, Instruction *BeforeInst) {
 
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType()->getContainedType(0);
@@ -231,7 +243,7 @@ void AprofHook::InsertAprofRead(Value *var, Instruction *BeforeInst) {
 
 }
 
-void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
+void AprofHook::InstrumentAlloc(Value *var, Instruction *AfterInst) {
 
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType();
@@ -252,7 +264,7 @@ void AprofHook::InsertAprofAlloc(Value *var, Instruction *AfterInst) {
 
 }
 
-void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
+void AprofHook::InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst) {
     std::vector<Value *> vecParams;
 
     ConstantInt *const_int6 = ConstantInt::get(
@@ -271,6 +283,7 @@ void AprofHook::InsertAprofCallBefore(int FuncID, Instruction *BeforeCallInst) {
 }
 
 void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
+
     BasicBlock *pEntryBlock = &(pFunction->getEntryBlock());
     BasicBlock::iterator itCurrent = pEntryBlock->begin();
     Instruction *pInstBefore = &(*itCurrent);
@@ -317,12 +330,11 @@ void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
                     break;
                 }
             }
-
         }
     }
 }
 
-void AprofHook::InsertAprofReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
+void AprofHook::InstrumentReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
     std::vector<Value *> vecParams;
     LoadInst *bb_pLoad = new LoadInst(this->BBAllocInst, "", false, BeforeInst);
     bb_pLoad->setAlignment(8);
@@ -343,7 +355,7 @@ void AprofHook::InsertAprofReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
     void_49->setAttributes(void_PAL);
 }
 
-void AprofHook::InsertAprofHooks(Function *Func) {
+void AprofHook::InstrumentHooks(Function *Func) {
 
     int FuncID = GetFunctionID(Func);
 
@@ -351,7 +363,7 @@ void AprofHook::InsertAprofHooks(Function *Func) {
 
     if (FuncID > 0) {
         Instruction *firstInst = &*(Func->begin()->begin());
-        InsertAprofCallBefore(FuncID, firstInst);
+        InstrumentCallBefore(FuncID, firstInst);
         InstrumentCostUpdater(Func);
 //        InstrumentRmsUpdater(Func);
     }
@@ -382,7 +394,7 @@ void AprofHook::InsertAprofHooks(Function *Func) {
                         }
                         // FIXME::ignore function pointer store!
                         if (!isa<FunctionType>(secondOpType)) {
-                            InsertAprofWrite(secondOp, Inst);
+                            InstrumentWrite(secondOp, Inst);
                         }
                     }
 
@@ -393,7 +405,7 @@ void AprofHook::InsertAprofHooks(Function *Func) {
                     if (HasInsertFlag(Inst, READ)) {
                         II++;
                         Instruction *afterInst = &*II;
-                        InsertAprofAlloc(Inst, afterInst);
+                        InstrumentAlloc(Inst, afterInst);
                         II--;
                     }
                     break;
@@ -403,7 +415,7 @@ void AprofHook::InsertAprofHooks(Function *Func) {
                     // load instruction only has one operand !!!
                     if (HasInsertFlag(Inst, READ)) {
                         Value *firstOp = Inst->getOperand(0);
-                        InsertAprofRead(firstOp, Inst);
+                        InstrumentRead(firstOp, Inst);
                     }
 
                     break;
@@ -425,8 +437,7 @@ void AprofHook::InsertAprofHooks(Function *Func) {
 
                 case Instruction::Ret: {
 
-                    InsertAprofReturn(Inst, need_update_rms);
-
+                    InstrumentReturn(Inst, need_update_rms);
                     break;
                 }
             }
@@ -446,6 +457,10 @@ void AprofHook::SetupInit() {
 
 void AprofHook::SetupHooks() {
 
+
+
+
+
     // init all global and constants variables
     SetupInit();
 
@@ -454,13 +469,19 @@ void AprofHook::SetupHooks() {
 
         Function *Func = &*FI;
 
-        if (!IsClonedFunc(Func)) {
+        if (isSampling == 1) {
+            if (!IsClonedFunc(Func)) {
+                continue;
+            }
+        } else if (IsIgnoreFunc(Func)) {
             continue;
         }
 
-        errs() << Func->getName() << ":" << GetFunctionID(Func) << "\n";
+        if (this->funNameIDFile)
+            this->funNameIDFile << Func->getName().str()
+                                << ":" << GetFunctionID(Func) << "\n";
 
-        InsertAprofHooks(Func);
+        InstrumentHooks(Func);
 
     }
 
@@ -468,11 +489,22 @@ void AprofHook::SetupHooks() {
     if (MainFunc) {
 
         Instruction *firstInst = &*(MainFunc->begin()->begin());
-        InsertAprofInit(firstInst);
+        InstrumentInit(firstInst);
     }
 }
 
 bool AprofHook::runOnModule(Module &M) {
+
+    if (strFileName.empty()) {
+
+        errs() << "You not set outfile to save function name and ID." << "\n";
+
+    } else {
+
+        this->funNameIDFile.open(
+                strFileName,
+                std::ofstream::out | std::ofstream::app);
+    }
 
     this->pModule = &M;
     SetupHooks();

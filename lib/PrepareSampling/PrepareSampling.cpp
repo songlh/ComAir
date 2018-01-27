@@ -15,17 +15,19 @@
 
 #include "Common/Constant.h"
 #include "Common/Helper.h"
-#include "PrepareAprof/PrePareAprof.h"
+#include "PrepareSampling/PrePareSampling.h"
 
 
 using namespace llvm;
 using namespace std;
 
 
-static RegisterPass<PrepareAprof> X(
-        "prepare-profiling",
-        "prepare for profiling", true, true);
+static RegisterPass<PrepareSampling> X(
+        "prepare-sampling",
+        "prepare for sampling", true, true);
 
+
+/* ---- local function ---- */
 
 void GetAllReturnSite(Function *pFunction, set<ReturnInst *> &setRet) {
 
@@ -82,6 +84,7 @@ bool IsNeedChangeCallee(Function *F) {
 
 }
 
+
 Function *SearchFunctionByName(std::set<Function *> FuncSet,
                                std::string FuncName) {
 
@@ -101,28 +104,45 @@ Function *SearchFunctionByName(std::set<Function *> FuncSet,
     return NULL;
 }
 
+bool IsNeededClone(Function *F) {
 
-char PrepareAprof::ID = 0;
+    if (F->isDeclaration() || F->isIntrinsic())
+        return false;
 
-void PrepareAprof::getAnalysisUsage(AnalysisUsage &AU) const {
+    if (F->getSection().str() == ".text.startup") {
+        return false;
+    }
+
+    // TODO: maybe main function also can be cloned!
+    if (F->getName().str() == "main")
+        return false;
+
+    return true;
+}
+
+/* ---- end ---- */
+
+char PrepareSampling::ID = 0;
+
+void PrepareSampling::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.setPreservesAll();
     AU.addRequired<PostDominatorTreeWrapperPass>();
     AU.addRequired<DominatorTreeWrapperPass>();
 }
 
-PrepareAprof::PrepareAprof() : ModulePass(ID) {
+PrepareSampling::PrepareSampling() : ModulePass(ID) {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializePostDominatorTreeWrapperPassPass(Registry);
     initializeDominatorTreeWrapperPassPass(Registry);
 
 }
 
-void PrepareAprof::SetupTypes(Module *pModule) {
+void PrepareSampling::SetupTypes(Module *pModule) {
     this->LongType = IntegerType::get(pModule->getContext(), 64);
     this->IntType = IntegerType::get(pModule->getContext(), 32);
 }
 
-void PrepareAprof::SetupConstants(Module *pModule) {
+void PrepareSampling::SetupConstants(Module *pModule) {
     this->ConstantInt0 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("0"), 10));
     this->ConstantBigInt = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("100"), 10));
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
@@ -130,7 +150,7 @@ void PrepareAprof::SetupConstants(Module *pModule) {
     this->ConstantIntN1 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("-1"), 10));
 }
 
-void PrepareAprof::SetupGlobals(Module *pModule) {
+void PrepareSampling::SetupGlobals(Module *pModule) {
     assert(pModule->getGlobalVariable("Switcher") == NULL);
     this->Switcher = new GlobalVariable(*pModule, this->IntType,
                                         false, GlobalValue::ExternalLinkage,
@@ -140,14 +160,14 @@ void PrepareAprof::SetupGlobals(Module *pModule) {
 
     assert(pModule->getGlobalVariable("GeoRate") == NULL);
     this->GeoRate = new GlobalVariable(*pModule, this->IntType,
-                                        false, GlobalValue::ExternalLinkage,
-                                        0, "GeoRate");
+                                       false, GlobalValue::ExternalLinkage,
+                                       0, "GeoRate");
     this->GeoRate->setAlignment(4);
     this->GeoRate->setInitializer(this->ConstantBigInt);
 
 }
 
-void PrepareAprof::SetupFunctions(Module *pModule) {
+void PrepareSampling::SetupFunctions(Module *pModule) {
     std::vector<Type *> ArgTypes;
 
     // aprof_geo
@@ -160,7 +180,7 @@ void PrepareAprof::SetupFunctions(Module *pModule) {
 
 }
 
-BinaryOperator *PrepareAprof::CreateIfElseBlock(
+BinaryOperator *PrepareSampling::CreateIfElseBlock(
         Function *pFunction, Module *pModule, std::vector<BasicBlock *> &vecAdd) {
 
     BasicBlock *pEntryBlock = NULL;
@@ -201,7 +221,7 @@ BinaryOperator *PrepareAprof::CreateIfElseBlock(
     return pAdd1;
 }
 
-void PrepareAprof::RemapInstruction(Instruction *I, ValueToValueMapTy &VMap) {
+void PrepareSampling::RemapInstruction(Instruction *I, ValueToValueMapTy &VMap) {
 
     for (unsigned op = 0, E = I->getNumOperands(); op != E; ++op) {
 
@@ -226,7 +246,7 @@ void PrepareAprof::RemapInstruction(Instruction *I, ValueToValueMapTy &VMap) {
 
 }
 
-void PrepareAprof::CloneTargetFunction(
+void PrepareSampling::CloneTargetFunction(
         Function *pFunction, vector<BasicBlock *> &vecAdd,
         ValueToValueMapTy &VMap) {
 
@@ -396,7 +416,7 @@ void PrepareAprof::CloneTargetFunction(
     }
 }
 
-void PrepareAprof::SetupInit(Module *pModule) {
+void PrepareSampling::SetupInit(Module *pModule) {
     // all set up operation
     this->pModule = pModule;
     SetupTypes(pModule);
@@ -406,7 +426,7 @@ void PrepareAprof::SetupInit(Module *pModule) {
 
 }
 
-void PrepareAprof::AddSwitcher(Function *F) {
+void PrepareSampling::AddSwitcher(Function *F) {
 //     SplitReturnBlock(F);
 //     std::vector<BasicBlock *> vecAdd;
 //     BinaryOperator *pAdd = CreateIfElseBlock(F, this->pModule, vecAdd);
@@ -506,7 +526,7 @@ void PrepareAprof::AddSwitcher(Function *F) {
 
 }
 
-void PrepareAprof::CloneFunctionCalled() {
+void PrepareSampling::CloneFunctionCalled() {
 
     std::vector<Function *> WaitForChangeCalled;
 
@@ -543,11 +563,13 @@ void PrepareAprof::CloneFunctionCalled() {
                 switch (Inst->getOpcode()) {
 
                     case Instruction::Call: {
+
                         CallSite ci(Inst);
                         Function *Callee = dyn_cast<Function>(
                                 ci.getCalledValue()->stripPointerCasts());
 
                         if (IsNeedChangeCallee(Callee)) {
+
                             CallInst *pCall = dyn_cast<CallInst>(Inst);
 
                             std::string funcName = Callee->getName().str();
@@ -555,10 +577,14 @@ void PrepareAprof::CloneFunctionCalled() {
                                     tempVector, funcName);
 
                             if (targetFunc) {
+
                                 pCall->setCalledFunction(targetFunc);
+
                             } else {
+
                                 pCall->dump();
                                 errs() << "There is error find target function!" << "\n";
+
                             }
                         }
 
@@ -574,7 +600,8 @@ void PrepareAprof::CloneFunctionCalled() {
 
 }
 
-bool PrepareAprof::runOnModule(Module &M) {
+bool PrepareSampling::runOnModule(Module &M) {
+
     /* setup init */
     SetupInit(&M);
 
@@ -585,14 +612,7 @@ bool PrepareAprof::runOnModule(Module &M) {
 
         Function *F = &*FI;
 
-        if (F->isDeclaration() || F->isIntrinsic())
-            continue;
-
-        if (F->getSection().str() == ".text.startup") {
-            continue;
-        }
-
-        if (F->getName().str() == "main")
+        if (!IsNeededClone(F))
             continue;
 
         NeedClone.push_back(F);
@@ -602,7 +622,6 @@ bool PrepareAprof::runOnModule(Module &M) {
     for (auto *Func: NeedClone) {
         AddSwitcher(Func);
     }
-    /* ---- end ---- */
 
     /* ---- change clone function callees ---- */
     CloneFunctionCalled();

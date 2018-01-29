@@ -1,5 +1,6 @@
 add_subdirectory(AProf)
 add_subdirectory(AprofHook)
+add_subdirectory(BBProfiling)
 add_subdirectory(Common)
 add_subdirectory(llvm-Commons)
 add_subdirectory(Analysis)

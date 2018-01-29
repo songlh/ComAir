@@ -28,8 +28,8 @@ static cl::opt<int> onlyBBCount("only-bb-count",
 
 
 static cl::opt<int> isSampling("is-sampling",
-                                cl::desc("Whether to perform sampling"),
-                                cl::init(0));
+                               cl::desc("Whether to perform sampling"),
+                               cl::init(0));
 
 
 static cl::opt<std::string> strFileName(
@@ -88,6 +88,8 @@ void AprofHook::SetupFunctions() {
     FunctionType *AprofInitType = FunctionType::get(this->IntType, ArgTypes, false);
     this->aprof_init = Function::Create
             (AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", this->pModule);
+//    Attribute attr = Attribute::get(this->pModule->getContext(), "always_inline");
+//    this->aprof_init->addAttribute(0, attr);
     ArgTypes.clear();
 
     // aprof_increment_cost
@@ -201,20 +203,23 @@ void AprofHook::InstrumentWrite(Value *var, Instruction *BeforeInst) {
     while (isa<PointerType>(type_1))
         type_1 = type_1->getContainedType(0);
 
-    ConstantInt *const_int6 = ConstantInt::get(
-            this->pModule->getContext(),
-            APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+    if (type_1->isSized()) {
 
-    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
-                                       "", BeforeInst);
-    std::vector<Value *> void_51_params;
-    void_51_params.push_back(ptr_50);
-    void_51_params.push_back(const_int6);
-    CallInst *void_51 = CallInst::Create(this->aprof_write, void_51_params, "", BeforeInst);
-    void_51->setCallingConv(CallingConv::C);
-    void_51->setTailCall(false);
-    AttributeList void_PAL;
-    void_51->setAttributes(void_PAL);
+        ConstantInt *const_int6 = ConstantInt::get(
+                this->pModule->getContext(),
+                APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+
+        CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
+                                           "", BeforeInst);
+        std::vector<Value *> void_51_params;
+        void_51_params.push_back(ptr_50);
+        void_51_params.push_back(const_int6);
+        CallInst *void_51 = CallInst::Create(this->aprof_write, void_51_params, "", BeforeInst);
+        void_51->setCallingConv(CallingConv::C);
+        void_51->setTailCall(false);
+        AttributeList void_PAL;
+        void_51->setAttributes(void_PAL);
+    }
 
 }
 
@@ -226,21 +231,22 @@ void AprofHook::InstrumentRead(Value *var, Instruction *BeforeInst) {
     while (isa<PointerType>(type_1))
         type_1 = type_1->getContainedType(0);
 
-    ConstantInt *const_int6 = ConstantInt::get(
-            this->pModule->getContext(),
-            APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+    if (type_1->isSized()) {
+        ConstantInt *const_int6 = ConstantInt::get(
+                this->pModule->getContext(),
+                APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
 
-    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
-                                       "", BeforeInst);
-    std::vector<Value *> void_51_params;
-    void_51_params.push_back(ptr_50);
-    void_51_params.push_back(const_int6);
-    CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", BeforeInst);
-    void_51->setCallingConv(CallingConv::C);
-    void_51->setTailCall(false);
-    AttributeList void_PAL;
-    void_51->setAttributes(void_PAL);
-
+        CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
+                                           "", BeforeInst);
+        std::vector<Value *> void_51_params;
+        void_51_params.push_back(ptr_50);
+        void_51_params.push_back(const_int6);
+        CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", BeforeInst);
+        void_51->setCallingConv(CallingConv::C);
+        void_51->setTailCall(false);
+        AttributeList void_PAL;
+        void_51->setAttributes(void_PAL);
+    }
 }
 
 void AprofHook::InstrumentAlloc(Value *var, Instruction *AfterInst) {
@@ -427,7 +433,7 @@ void AprofHook::InstrumentHooks(Function *Func) {
                     Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
 
                     // fgetc automatic rms++;
-                    if (Callee->getName().str() == "fgetc") {
+                    if (Callee && Callee->getName().str() == "fgetc") {
                         need_update_rms = true;
                         InstrumentRmsUpdater(Inst->getFunction());
                     }
@@ -456,10 +462,6 @@ void AprofHook::SetupInit() {
 }
 
 void AprofHook::SetupHooks() {
-
-
-
-
 
     // init all global and constants variables
     SetupInit();

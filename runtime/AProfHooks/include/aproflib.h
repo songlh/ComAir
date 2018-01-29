@@ -52,7 +52,9 @@ void logger_init();
 
 char * _init_share_mem();
 
-int aprof_init();
+inline void init_page_table() __attribute__((always_inline));
+
+inline int aprof_init() __attribute__((always_inline));
 
 void aprof_write(void *memory_addr, unsigned int length);
 
@@ -75,5 +77,9 @@ void aprof_return(unsigned long numCost, unsigned long rms);
 //----- sampling generator---------
 int aprof_geo(int iRate);            // Returns a geometric random variable
 static double rand_val(int seed);    // Jain's RNG
+
+// --- ----
+
+void PrintExecutionCost(long numCost);
 
 #endif

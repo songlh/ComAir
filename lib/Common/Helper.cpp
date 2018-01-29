@@ -98,6 +98,10 @@ int GetInstructionInsertFlag(Instruction *II) {
 
 bool IsIgnoreFunc(Function *F) {
 
+    if (!F) {
+        return true;
+    }
+
     if (F->getSection().str() == ".text.startup") {
         return true;
     }

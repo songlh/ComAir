@@ -190,13 +190,12 @@ void aprof_write(void *memory_addr, unsigned int length) {
 }
 
 void aprof_read(void *memory_addr, unsigned int length) {
-    unsigned long i;
     unsigned long start_addr = (unsigned long) memory_addr;
 
 //    log_trace("aprof_read: top element funcID %d", shadow_stack[stack_top].funcId);
 //    log_trace("aprof_read: top element index %d", stack_top);
 
-    for (i = start_addr; i < (start_addr + length); i++) {
+    for (unsigned long i = start_addr; i < (start_addr + length); i++) {
 
         // We assume that w has been wrote before reading.
         // ts[w] > 0 and ts[w] < S[top]
@@ -336,4 +335,9 @@ static double rand_val(int seed) {
 
     // Return a random value between 0.0 and 1.0
     return ((double) x / m);
+}
+
+
+void PrintExecutionCost(long numCost) {
+    printf("%ld", numCost);
 }

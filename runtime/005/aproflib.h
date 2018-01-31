@@ -27,6 +27,8 @@
 
 #define NEG_L3_MASK 0xFFFFFC00
 
+#define STACK_SIZE 2000
+
 void aprof_init_page_table();
 
 unsigned long aprof_query_page_table(unsigned long address);
@@ -50,9 +52,9 @@ struct stack_elem {
 
 char * aprof_init_share_mem();
 
-inline void aprof_init_page_table() __attribute__((always_inline));
+//aprof_init_page_table();
 
-inline void aprof_init() __attribute__((always_inline));
+void aprof_init();
 
 void aprof_write(void *memory_addr, unsigned int length);
 
@@ -69,7 +71,7 @@ void aprof_collect();
 
 void aprof_call_after();
 
-inline void aprof_return(unsigned long numCost, unsigned long rms)  __attribute__((always_inline));
+void aprof_return(unsigned long numCost, unsigned long rms);
 
 
 //----- sampling generator---------

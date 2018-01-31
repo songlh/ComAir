@@ -251,12 +251,14 @@ typedef struct stAbstractHashedMap
 
 int AbstractHashedMap_calculateThreshold(int newCapacity, float factor)
 {
-	return (int)(newCapacity * factor);
+	int ret = (int)(newCapacity * factor);
+	return ret;
 }
 
 int AbstractHashedMap_calculateNewCapacity(int proposedCapacity)
 {
 	int newCapacity = 1;
+
 	if(proposedCapacity > MAXIMUM_CAPACITY)
 	{
 		newCapacity = MAXIMUM_CAPACITY;

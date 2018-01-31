@@ -296,8 +296,8 @@ int aprof_geo(int iRate) {
 
     old_value = (int) geo_value;
     // log sampling call chain number
-    sampling_count = count - sampling_count;
-    log_fatal("sampling count: %ld;", sampling_count);
+//    sampling_count = count - sampling_count;
+//    log_fatal("sampling count: %ld;", sampling_count);
     return old_value;
 }
 

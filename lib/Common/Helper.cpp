@@ -106,9 +106,14 @@ bool IsIgnoreFunc(Function *F) {
         return true;
     }
 
+    if (F->getName() == "JS_Assert") {
+        return true;
+    }
+
     int FuncID = GetFunctionID(F);
 
     if (FuncID < 0) {
+
         return true;
     }
 

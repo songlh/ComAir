@@ -34,8 +34,6 @@ struct AprofHook : public ModulePass {
 
     void SetupHooks();
 
-    void InstrumentCostUpdater(BasicBlock *);
-
     void InstrumentInit(Instruction *);
 
     void InstrumentHooks(Function *);

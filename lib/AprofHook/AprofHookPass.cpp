@@ -10,6 +10,7 @@
 #include "AprofHook/AprofHookPass.h"
 #include "Common/Constant.h"
 #include "Common/Helper.h"
+#include "Support/BBProfiling.h"
 
 
 using namespace llvm;
@@ -85,7 +86,7 @@ void AprofHook::SetupFunctions() {
     std::vector<Type *> ArgTypes;
 
     // aprof_init
-    FunctionType *AprofInitType = FunctionType::get(this->IntType, ArgTypes, false);
+    FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
     this->aprof_init = Function::Create
             (AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", this->pModule);
 //    Attribute attr = Attribute::get(this->pModule->getContext(), "always_inline");
@@ -155,43 +156,29 @@ void AprofHook::InstrumentInit(Instruction *firstInst) {
 
 }
 
-void AprofHook::InstrumentCostUpdater(BasicBlock *pBlock) {
-
-    int NumCost = GetBBCostNum(pBlock);
-
-    if (NumCost > 0) {
-
-        TerminatorInst *pTerminator = pBlock->getTerminator();
-        LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pTerminator);
-        pLoadnumCost->setAlignment(8);
-
-        Type *tInt = Type::getInt64Ty(pModule->getContext());
-
-        BinaryOperator *pAdd = BinaryOperator::Create(
-                Instruction::Add, pLoadnumCost,
-                ConstantInt::get(tInt, NumCost),
-                "add", pTerminator);
-
-        StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, false, pTerminator);
-        pStore->setAlignment(8);
-
-    }
-}
-
 void AprofHook::InstrumentCostUpdater(Function *pFunction) {
-    BasicBlock *pEntryBlock = &(pFunction->getEntryBlock());
-    BasicBlock::iterator itCurrent = pEntryBlock->begin();
-    Instruction *pInstBefore = &(*itCurrent);
 
-    while (isa<AllocaInst>(pInstBefore)) {
-        itCurrent++;
-        pInstBefore = &(*itCurrent);
-    }
+    BBProfilingGraph bbGraph = BBProfilingGraph(*pFunction);
 
-    this->BBAllocInst = new AllocaInst(this->LongType, 0, "aprof_cost_bb", pInstBefore);
+    bbGraph.init();
+    bbGraph.splitNotExitBlock();
+    //bbGraph.printNodeEdgeInfo();
+
+    //bbGraph.printNodeEdgeInfo();
+    bbGraph.calculateSpanningTree();
+
+    BBProfilingEdge *pQueryEdge = bbGraph.addQueryChord();
+    bbGraph.calculateChordIncrements();
+
+    Instruction *pInstBefore = pFunction->getEntryBlock().getFirstNonPHI();;
+
+
+    this->BBAllocInst = new AllocaInst(this->LongType, 0, "numCost", pInstBefore);
     this->BBAllocInst->setAlignment(8);
     StoreInst *pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, false, pInstBefore);
     pStore->setAlignment(8);
+
+    bbGraph.instrumentLocalCounterUpdate(this->BBAllocInst);
 
 }
 
@@ -341,16 +328,20 @@ void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
 }
 
 void AprofHook::InstrumentReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
+
     std::vector<Value *> vecParams;
     LoadInst *bb_pLoad = new LoadInst(this->BBAllocInst, "", false, BeforeInst);
     bb_pLoad->setAlignment(8);
     vecParams.push_back(bb_pLoad);
 
     if (NeedUpdateRms) {
+
         LoadInst *rms_pLoad = new LoadInst(this->RmsAllocInst, "", false, BeforeInst);
         rms_pLoad->setAlignment(8);
         vecParams.push_back(rms_pLoad);
+
     } else {
+
         vecParams.push_back(this->ConstantLong0);
     }
 
@@ -378,7 +369,7 @@ void AprofHook::InstrumentHooks(Function *Func) {
 
         BasicBlock *BB = &*BI;
 
-        InstrumentCostUpdater(BB);
+//        InstrumentCostUpdater(BB);
 
         for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
 

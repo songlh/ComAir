@@ -29,7 +29,7 @@ int stack_top = -1;
 static int old_value = -1;
 
 
-unsigned long query_page_table(unsigned long addr) {
+unsigned long aprof_query_page_table(unsigned long addr) {
 
     if ((addr & NEG_L3_MASK) == prev) {
         return prev_pL3[addr & L3_MASK];
@@ -67,7 +67,7 @@ unsigned long query_page_table(unsigned long addr) {
 }
 
 
-void insert_page_table(unsigned long addr, unsigned long count) {
+void aprof_insert_page_table(unsigned long addr, unsigned long count) {
 
     if ((addr & NEG_L3_MASK) == prev) {
         prev_pL3[addr & L3_MASK] = count;
@@ -109,7 +109,7 @@ void insert_page_table(unsigned long addr, unsigned long count) {
 
 }
 
-void destroy_page_table() {
+void aprof_destroy_page_table() {
     int i, j, k;
 
     for (i = 0; i < L0_TABLE_SIZE; i++) {
@@ -141,7 +141,7 @@ void destroy_page_table() {
     free(pL0);
 }
 
-char *_init_share_mem() {
+char *aprof_init_share_mem() {
     int fd = shm_open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
 
     if (fd < 0) {
@@ -156,13 +156,6 @@ char *_init_share_mem() {
 
 void aprof_init() {
 
-    // init logger
-//    const char *FILENAME = "aprof_logger.txt";
-//    int LEVEL = 2;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
-//    int QUIET = 1;
-//    FILE *fp = fopen(FILENAME, "w");
-//    log_init(fp, LEVEL, QUIET);
-
     // init page table
     pL0 = (void **) malloc(sizeof(void *) * L0_TABLE_SIZE);
     memset(pL0, 0, sizeof(void *) * L0_TABLE_SIZE);
@@ -173,7 +166,7 @@ void aprof_write(void *memory_addr, unsigned int length) {
     length = 1;
 
     for (unsigned long i = start_addr; i < start_addr + length; i++) {
-        insert_page_table(i, count);
+        aprof_insert_page_table(i, count);
     }
 
 }
@@ -185,7 +178,7 @@ void aprof_read(void *memory_addr, unsigned int length) {
 
         // We assume that w has been wrote before reading.
         // ts[w] > 0 and ts[w] < S[top]
-        unsigned long ts_w = query_page_table(i);
+        unsigned long ts_w = aprof_query_page_table(i);
         if (ts_w < shadow_stack[stack_top].ts) {
 
             shadow_stack[stack_top].rms++;
@@ -201,7 +194,7 @@ void aprof_read(void *memory_addr, unsigned int length) {
             }
         }
 
-        insert_page_table(i, count);
+        aprof_insert_page_table(i, count);
     }
 
 }
@@ -248,38 +241,11 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 
     } else {
         // log result to memory.
-        void *ptr = _init_share_mem();
+        void *ptr = aprof_init_share_mem();
         strcpy((char *) ptr, log_str);
-        destroy_page_table();
+        aprof_destroy_page_table();
     }
 
-}
-
-//===========================================================================
-//=  Function to generate geometrically distributed random variables        =
-//=    - Input:  Probability of success p                                   =
-//=    - Output: Returns with geometrically distributed random variable     =
-//===========================================================================
-int aprof_geo(int iRate) {
-    double p = 1 / (double) iRate;
-    double z;                     // Uniform random number (0 < z < 1)
-    double geo_value;             // Computed geometric value to be returned
-
-    do {
-        // Pull a uniform random number (0 < z < 1)
-        do {
-            z = rand_val(0);
-        } while ((z == 0) || (z == 1));
-
-        // Compute geometric random variable using inversion method
-        geo_value = (int) (log(z) / log(1.0 - p)) + 1;
-    } while ((int) geo_value == old_value + 1);
-
-    old_value = (int) geo_value;
-    // log sampling call chain number
-//    sampling_count = count - sampling_count;
-//    log_fatal("sampling count: %ld;", sampling_count);
-    return old_value;
 }
 
 //=========================================================================
@@ -289,7 +255,7 @@ int aprof_geo(int iRate) {
 //=   - From R. Jain, "The Art of Computer Systems Performance Analysis," =
 //=     John Wiley & Sons, 1991. (Page 443, Figure 26.2)                  =
 //=========================================================================
-static double rand_val(int seed) {
+static double aprof_rand_val(int seed) {
     const long a = 16807;  // Multiplier
     const long m = 2147483647;  // Modulus
     const long q = 127773;  // m div a
@@ -318,7 +284,29 @@ static double rand_val(int seed) {
     return ((double) x / m);
 }
 
+//===========================================================================
+//=  Function to generate geometrically distributed random variables        =
+//=    - Input:  Probability of success p                                   =
+//=    - Output: Returns with geometrically distributed random variable     =
+//===========================================================================
+int aprof_geo(int iRate) {
+    double p = 1 / (double) iRate;
+    double z;                     // Uniform random number (0 < z < 1)
+    double geo_value;             // Computed geometric value to be returned
 
-void PrintExecutionCost(long numCost) {
-    printf("%ld", numCost);
+    do {
+        // Pull a uniform random number (0 < z < 1)
+        do {
+            z = aprof_rand_val(0);
+        } while ((z == 0) || (z == 1));
+
+        // Compute geometric random variable using inversion method
+        geo_value = (int) (log(z) / log(1.0 - p)) + 1;
+    } while ((int) geo_value == old_value + 1);
+
+    old_value = (int) geo_value;
+    // log sampling call chain number
+//    sampling_count = count - sampling_count;
+//    log_fatal("sampling count: %ld;", sampling_count);
+    return old_value;
 }

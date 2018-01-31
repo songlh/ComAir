@@ -86,63 +86,89 @@ void AprofHook::SetupFunctions() {
     std::vector<Type *> ArgTypes;
 
     // aprof_init
-    FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_init = Function::Create
-            (AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", this->pModule);
-//    Attribute attr = Attribute::get(this->pModule->getContext(), "always_inline");
-//    this->aprof_init->addAttribute(0, attr);
-    ArgTypes.clear();
+    this->aprof_init = this->pModule->getFunction("aprof_init");
+    if (!this->aprof_init) {
+        FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_init = Function::Create
+                (AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", this->pModule);
+        //    Attribute attr = Attribute::get(this->pModule->getContext(), "always_inline");
+        //    this->aprof_init->addAttribute(0, attr);
+        ArgTypes.clear();
+    }
+
+
 
     // aprof_increment_cost
-    FunctionType *AprofIncrementCostType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_increment_cost = Function::Create
-            (AprofIncrementCostType, GlobalValue::ExternalLinkage,
-             "aprof_increment_cost", this->pModule);
-    ArgTypes.clear();
+    this->aprof_increment_cost = this->pModule->getFunction("aprof_increment_cost");
+    if (!this->aprof_increment_cost) {
+        FunctionType *AprofIncrementCostType = FunctionType::get(this->VoidType, ArgTypes, false);
+
+        this->aprof_increment_cost = Function::Create
+                (AprofIncrementCostType, GlobalValue::ExternalLinkage,
+                 "aprof_increment_cost", this->pModule);
+        ArgTypes.clear();
+    }
+
 
     // aprof_increment_rms
-    FunctionType *AprofIncrementRmsType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_increment_rms = Function::Create
-            (AprofIncrementRmsType, GlobalValue::ExternalLinkage,
-             "aprof_increment_rms", this->pModule);
-    ArgTypes.clear();
+    this->aprof_increment_rms = this->pModule->getFunction("aprof_increment_rms");
+    if (!this->aprof_increment_rms) {
+        FunctionType *AprofIncrementRmsType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_increment_rms = Function::Create
+                (AprofIncrementRmsType, GlobalValue::ExternalLinkage,
+                 "aprof_increment_rms", this->pModule);
+        ArgTypes.clear();
+    }
 
     // aprof_write
-    ArgTypes.push_back(this->VoidPointerType);
-    ArgTypes.push_back(this->IntType);
-    FunctionType *AprofWriteType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_write = Function::Create
-            (AprofWriteType, GlobalValue::ExternalLinkage, "aprof_write", this->pModule);
-    this->aprof_write->setCallingConv(CallingConv::C);
-    ArgTypes.clear();
+    this->aprof_write = this->pModule->getFunction("aprof_write");
+    if (!this->aprof_write) {
+        ArgTypes.push_back(this->VoidPointerType);
+        ArgTypes.push_back(this->IntType);
+        FunctionType *AprofWriteType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_write = Function::Create
+                (AprofWriteType, GlobalValue::ExternalLinkage, "aprof_write", this->pModule);
+        this->aprof_write->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
 
     // aprof_read
-    ArgTypes.push_back(this->VoidPointerType);
-    ArgTypes.push_back(this->IntType);
-    FunctionType *AprofReadType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_read = Function::Create
-            (AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
-    this->aprof_read->setCallingConv(CallingConv::C);
-    ArgTypes.clear();
+    this->aprof_read = this->pModule->getFunction("aprof_read");
+    if (!this->aprof_read) {
+        ArgTypes.push_back(this->VoidPointerType);
+        ArgTypes.push_back(this->IntType);
+        FunctionType *AprofReadType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_read = Function::Create
+                (AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
+        this->aprof_read->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
 
     // aprof_call_before
-    ArgTypes.push_back(this->IntType);
+    this->aprof_call_before = this->pModule->getFunction("aprof_call_before");
+    if (!this->aprof_call_before) {
+        ArgTypes.push_back(this->IntType);
 //    ArgTypes.push_back(this->LongType);
-    FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType,
-                                                          ArgTypes, false);
-    this->aprof_call_before = Function::Create
-            (AprofCallBeforeType, GlobalValue::ExternalLinkage, "aprof_call_before", this->pModule);
-    this->aprof_call_before->setCallingConv(CallingConv::C);
-    ArgTypes.clear();
+        FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType,
+                                                              ArgTypes, false);
+        this->aprof_call_before = Function::Create
+                (AprofCallBeforeType, GlobalValue::ExternalLinkage, "aprof_call_before", this->pModule);
+        this->aprof_call_before->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+
+    }
 
     // aprof_return
-    ArgTypes.push_back(this->LongType);
-    ArgTypes.push_back(this->LongType);
-    FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
-    this->aprof_return = Function::Create
-            (AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return", this->pModule);
-    this->aprof_return->setCallingConv(CallingConv::C);
-    ArgTypes.clear();
+    this->aprof_return =  this->pModule->getFunction("aprof_return");
+    if (!this->aprof_return) {
+        ArgTypes.push_back(this->LongType);
+        ArgTypes.push_back(this->LongType);
+        FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_return = Function::Create
+                (AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return", this->pModule);
+        this->aprof_return->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
 
 }
 

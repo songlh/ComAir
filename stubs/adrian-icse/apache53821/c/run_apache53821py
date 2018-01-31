@@ -9,18 +9,21 @@ import pandas as pd
 
 from scipy.optimize import curve_fit
 
-
 APROF_LOGGER = 'aprof_logger.txt'
 PATH = os.path.dirname(os.path.realpath(__file__))
 
 
+def generate_test_case(i):
+    return str((i + 1) * 100)
+
+
 def run_command():
-    for i in range(0, 1):
+    for i in range(0, 30):
         if os.path.exists(APROF_LOGGER):
-            new_name = APROF_LOGGER.split('.')[0] + '_' + str(i - 1) + '.txt'
+            new_name = APROF_LOGGER.split('.')[0] + '_' + str(i) + '.txt'
             os.rename(APROF_LOGGER, new_name)
 
-        command = ['./a.out ', ' ', '20']
+        command = ['./a.out ', ' ', generate_test_case(i)]
         with open('test.sh', 'w') as run_script:
             run_script.writelines(command)
             st = os.stat('test.sh')
@@ -41,7 +44,7 @@ def clean_temp_files():
                     os.path.join(PATH, os.path.join(
                         dirname[2:], filename)))
 
-    print('Clean all temps file!')
+    print('Clean all temp files!')
 
 
 def _parser(file_name, run_id):
@@ -72,7 +75,7 @@ def parse_log_file():
                     results.append(item)
 
     df = pd.DataFrame(data=results, columns=['func_id', 'rms', 'cost', 'run_id'])
-    df.to_csv('fib_result.csv', index=False)
+    df.to_csv('apache35821_result.csv', index=False)
 
 
 def calculate_curve_fit():
@@ -82,10 +85,10 @@ def calculate_curve_fit():
     """
 
     def fund(x, a, b):
-        return a**x + b
+        return x ** a + b
 
-    df = pd.read_csv('fib_result.csv')
-    df = df.loc[df['func_id'] == 2]
+    df = pd.read_csv('apache35821_result.csv')
+    df = df.loc[df['func_id'] == 69]
     xdata = df[['rms']].apply(pd.to_numeric)
     ydata = df[['cost']].apply(pd.to_numeric)
 
@@ -93,14 +96,13 @@ def calculate_curve_fit():
     ydata = [item[0] for item in ydata.values]
 
     popt, pcov = curve_fit(fund, xdata, ydata)
-    # print [a, b]
     # print y = x^a +/- b
     op_code = '+'
     if popt[1] < 0:
         op_code = '-'
         popt[1] = popt[1] * -1
 
-    to_str = ['y = ', '%.2f' % popt[0], '^x', op_code, ' ', '%.2f' % popt[1]]
+    to_str = ['y = x^', '%.2f' % popt[0], ' ', op_code, ' ', '%.2f' % popt[1]]
     print(''.join(to_str))
 
 

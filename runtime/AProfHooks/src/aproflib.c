@@ -22,7 +22,7 @@ unsigned long *prev_pL3 = NULL;
 char log_str[BUFFERSIZE];
 unsigned long count = 0;
 unsigned long sampling_count = 0;
-struct stack_elem shadow_stack[200];
+struct stack_elem shadow_stack[1000];
 int stack_top = -1;
 
 // used to sampling

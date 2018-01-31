@@ -27,13 +27,13 @@
 
 #define NEG_L3_MASK 0xFFFFFC00
 
-void init_page_table();
+void aprof_init_page_table();
 
-unsigned long query_page_table(unsigned long address);
+unsigned long aprof_query_page_table(unsigned long address);
 
-void insert_page_table(unsigned long address, unsigned long count);
+void aprof_insert_page_table(unsigned long address, unsigned long count);
 
-void destroy_page_table();
+void aprof_destroy_page_table();
 
 // page table
 
@@ -48,11 +48,9 @@ struct stack_elem {
     unsigned long cost;
 };
 
-void logger_init();
+char * aprof_init_share_mem();
 
-char * _init_share_mem();
-
-inline void init_page_table() __attribute__((always_inline));
+inline void aprof_init_page_table() __attribute__((always_inline));
 
 inline void aprof_init() __attribute__((always_inline));
 
@@ -76,10 +74,6 @@ inline void aprof_return(unsigned long numCost, unsigned long rms)  __attribute_
 
 //----- sampling generator---------
 int aprof_geo(int iRate);            // Returns a geometric random variable
-static double rand_val(int seed);    // Jain's RNG
-
-// --- ----
-
-void PrintExecutionCost(long numCost);
+static double aprof_rand_val(int seed);    // Jain's RNG
 
 #endif

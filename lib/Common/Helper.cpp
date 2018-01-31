@@ -7,6 +7,7 @@
 #include "Common/Helper.h"
 
 using namespace llvm;
+using namespace std;
 
 
 int GetFunctionID(Function *F) {
@@ -106,7 +107,13 @@ bool IsIgnoreFunc(Function *F) {
         return true;
     }
 
-    if (F->getName() == "JS_Assert") {
+    std::string FuncName = F->getName().str();
+
+    if (FuncName == "JS_Assert") {
+        return true;
+    }
+
+    if (FuncName.substr(0, 5) == "aprof") {
         return true;
     }
 

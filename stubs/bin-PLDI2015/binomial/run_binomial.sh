@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 HOME=/home/tzt77/Develop/ComAir/cmake-build-debug
-WORK=/home/tzt77/Develop/ComAir/stubs/bin-PLDI2015/fib
-TEST_PROGRAM=${WORK}/fib-base.cpp
-BC_FILE=${WORK}/fib-base.bc
-PRE_BC_FILE=${WORK}/fib-base.pre.bc
-BC_ID_FILE=${WORK}/fib-base.id.bc
-BC_MARK_FILE=${WORK}/fib-base.mark.bc
-BC_PROF_FILE=${WORK}/fib-base.aprof.bc
-O_PROF_FILE=${WORK}/fib-base.aprof.o
+WORK=$(pwd)
+TEST_PROGRAM=${WORK}/binomial-base.cpp
+BC_FILE=${WORK}/target.bc
+PRE_BC_FILE=${WORK}/target.pre.bc
+BC_ID_FILE=${WORK}/target.id.bc
+BC_MARK_FILE=${WORK}/target.mark.bc
+BC_PROF_FILE=${WORK}/target.aprof.bc
+O_PROF_FILE=${WORK}/target.aprof.o
 
 RUNTIME_LIB=${HOME}/runtime/AProfHooks/libAProfHooks.a
 
@@ -60,7 +60,9 @@ do_not_sampling () {
  /HDD/llvm5.0/install/bin/clang++ -O2 ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lm -lrt
 
  # test one time
- ./a.out 3
+ ./a.out 50 5
+
+#  rm -f  *.bc *.ll *.o
 
  # run some times and calculate result
  # python run_fib.py

@@ -88,11 +88,11 @@ bool MakeFunctionInline::runOnModule(Module &M) {
         InlineFunctionInfo IFI;
         bool Changed = InlineFunction(pCall, IFI);
 
-        if (!Changed) {
-
-            pCall->dump();
-            errs() << "error inline!" << "\n";
-
-        }
+//        if (!Changed) {
+//
+//            pCall->dump();
+//            errs() << "error inline!" << "\n";
+//
+//        }
     }
 }

@@ -25,6 +25,11 @@ void getExitBlock(Function *pFunc, vector<BasicBlock *> &exitBlocks) {
         }
     }
 
+    if (exitBlocks.size() != 1) {
+        pFunc->dump();
+        errs() << exitBlocks.size() << "\n";
+    }
+
     assert(exitBlocks.size() == 1);
 }
 

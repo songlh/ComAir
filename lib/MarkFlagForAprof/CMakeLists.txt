@@ -1,6 +1,7 @@
 add_library(MarkFlagForAprofPass MODULE
     # List your source files here.
         MarkFlagForAprof.cpp
+        MarkFlagForAprofNoOpt.cpp
 )
 
 target_link_libraries(MarkFlagForAprofPass CommonLib)

@@ -22,7 +22,7 @@ unsigned long *prev_pL3 = NULL;
 char log_str[BUFFERSIZE];
 unsigned long count = 0;
 unsigned long sampling_count = 0;
-struct stack_elem shadow_stack[1000];
+struct stack_elem shadow_stack[STACK_SIZE];
 int stack_top = -1;
 
 // used to sampling
@@ -162,8 +162,8 @@ void aprof_init() {
 }
 
 void aprof_write(void *memory_addr, unsigned int length) {
+
     unsigned long start_addr = (unsigned long) memory_addr;
-    length = 1;
 
     for (unsigned long i = start_addr; i < start_addr + length; i++) {
         aprof_insert_page_table(i, count);
@@ -226,12 +226,12 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 //              shadow_stack[stack_top].cost
 //    );
 
-    char str[50];
-    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
-            shadow_stack[stack_top].funcId,
-            shadow_stack[stack_top].rms,
-            shadow_stack[stack_top].cost);
-    strcat(log_str, str);
+//    char str[50];
+//    sprintf(str, "ID %d , RMS %ld , Cost %ld \n",
+//            shadow_stack[stack_top].funcId,
+//            shadow_stack[stack_top].rms,
+//            shadow_stack[stack_top].cost);
+//    strcat(log_str, str);
 
     if (stack_top >= 1) {
 
@@ -241,8 +241,8 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 
     } else {
         // log result to memory.
-        void *ptr = aprof_init_share_mem();
-        strcpy((char *) ptr, log_str);
+//        void *ptr = aprof_init_share_mem();
+//        strcpy((char *) ptr, log_str);
         aprof_destroy_page_table();
     }
 
@@ -309,4 +309,9 @@ int aprof_geo(int iRate) {
 //    sampling_count = count - sampling_count;
 //    log_fatal("sampling count: %ld;", sampling_count);
     return old_value;
+}
+
+
+void PrintExecutionCost(long numCost) {
+    printf("%ld", numCost);
 }

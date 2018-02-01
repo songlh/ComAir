@@ -71,7 +71,7 @@ void aprof_collect();
 
 void aprof_call_after();
 
-void aprof_return(unsigned long numCost, unsigned long rms);
+void aprof_return(unsigned long numCost);
 
 
 //----- sampling generator---------

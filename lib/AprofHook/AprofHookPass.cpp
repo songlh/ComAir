@@ -5,6 +5,7 @@
 #include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/Instructions.h"
 #include "llvm/IR/Module.h"
+#include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/raw_ostream.h"
 
 #include "AprofHook/AprofHookPass.h"
@@ -65,8 +66,7 @@ void AprofHook::SetupTypes() {
     this->VoidType = Type::getVoidTy(pModule->getContext());
     this->IntType = IntegerType::get(pModule->getContext(), 32);
     this->LongType = IntegerType::get(pModule->getContext(), 64);
-    this->VoidPointerType = PointerType::get(
-            IntegerType::get(pModule->getContext(), 8), 0);
+    this->VoidPointerType = PointerType::get(IntegerType::get(pModule->getContext(), 8), 0);
 
 }
 
@@ -87,72 +87,77 @@ void AprofHook::SetupFunctions() {
 
     // aprof_init
     this->aprof_init = this->pModule->getFunction("aprof_init");
+    assert(this->aprof_init != NULL);
+
     if (!this->aprof_init) {
         FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
-        this->aprof_init = Function::Create
-                (AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", this->pModule);
-        //    Attribute attr = Attribute::get(this->pModule->getContext(), "always_inline");
-        //    this->aprof_init->addAttribute(0, attr);
+        this->aprof_init = Function::Create(AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", this->pModule);
+        // Attribute attr = Attribute::get(this->pModule->getContext(), "always_inline");
+        // this->aprof_init->addAttribute(0, attr);
         ArgTypes.clear();
     }
 
-
-
+    
+    /*
     // aprof_increment_cost
     this->aprof_increment_cost = this->pModule->getFunction("aprof_increment_cost");
+    assert(this->aprof_increment_cost != NULL);
+
     if (!this->aprof_increment_cost) {
         FunctionType *AprofIncrementCostType = FunctionType::get(this->VoidType, ArgTypes, false);
-
-        this->aprof_increment_cost = Function::Create
-                (AprofIncrementCostType, GlobalValue::ExternalLinkage,
-                 "aprof_increment_cost", this->pModule);
+        this->aprof_increment_cost = Function::Create(AprofIncrementCostType, GlobalValue::ExternalLinkage,
+                                                      "aprof_increment_cost", this->pModule);
         ArgTypes.clear();
     }
-
-
+    */
+    
     // aprof_increment_rms
     this->aprof_increment_rms = this->pModule->getFunction("aprof_increment_rms");
+    assert(this->aprof_increment_rms != NULL);
+
     if (!this->aprof_increment_rms) {
         FunctionType *AprofIncrementRmsType = FunctionType::get(this->VoidType, ArgTypes, false);
-        this->aprof_increment_rms = Function::Create
-                (AprofIncrementRmsType, GlobalValue::ExternalLinkage,
-                 "aprof_increment_rms", this->pModule);
+        this->aprof_increment_rms = Function::Create(AprofIncrementRmsType, GlobalValue::ExternalLinkage,
+                                                     "aprof_increment_rms", this->pModule);
         ArgTypes.clear();
     }
+    
 
     // aprof_write
     this->aprof_write = this->pModule->getFunction("aprof_write");
+    assert(this->aprof_write != NULL);
+
     if (!this->aprof_write) {
         ArgTypes.push_back(this->VoidPointerType);
         ArgTypes.push_back(this->IntType);
         FunctionType *AprofWriteType = FunctionType::get(this->VoidType, ArgTypes, false);
-        this->aprof_write = Function::Create
-                (AprofWriteType, GlobalValue::ExternalLinkage, "aprof_write", this->pModule);
+        this->aprof_write = Function::Create(AprofWriteType, GlobalValue::ExternalLinkage, "aprof_write", this->pModule);
         this->aprof_write->setCallingConv(CallingConv::C);
         ArgTypes.clear();
     }
 
     // aprof_read
     this->aprof_read = this->pModule->getFunction("aprof_read");
+    assert(this->aprof_read != NULL);
+
     if (!this->aprof_read) {
         ArgTypes.push_back(this->VoidPointerType);
         ArgTypes.push_back(this->IntType);
         FunctionType *AprofReadType = FunctionType::get(this->VoidType, ArgTypes, false);
-        this->aprof_read = Function::Create
-                (AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
+        this->aprof_read = Function::Create(AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
         this->aprof_read->setCallingConv(CallingConv::C);
         ArgTypes.clear();
     }
 
     // aprof_call_before
     this->aprof_call_before = this->pModule->getFunction("aprof_call_before");
+    assert(this->aprof_call_before != NULL);
+
     if (!this->aprof_call_before) {
         ArgTypes.push_back(this->IntType);
-//    ArgTypes.push_back(this->LongType);
-        FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType,
-                                                              ArgTypes, false);
-        this->aprof_call_before = Function::Create
-                (AprofCallBeforeType, GlobalValue::ExternalLinkage, "aprof_call_before", this->pModule);
+        //ArgTypes.push_back(this->LongType);
+        FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType, ArgTypes, false);
+        this->aprof_call_before = Function::Create(AprofCallBeforeType, GlobalValue::ExternalLinkage, "aprof_call_before", this->pModule);
         this->aprof_call_before->setCallingConv(CallingConv::C);
         ArgTypes.clear();
 
@@ -160,12 +165,13 @@ void AprofHook::SetupFunctions() {
 
     // aprof_return
     this->aprof_return =  this->pModule->getFunction("aprof_return");
+    assert(this->aprof_return != NULL);
+
     if (!this->aprof_return) {
         ArgTypes.push_back(this->LongType);
-        ArgTypes.push_back(this->LongType);
+        //ArgTypes.push_back(this->LongType);
         FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
-        this->aprof_return = Function::Create
-                (AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return", this->pModule);
+        this->aprof_return = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return", this->pModule);
         this->aprof_return->setCallingConv(CallingConv::C);
         ArgTypes.clear();
     }
@@ -208,7 +214,9 @@ void AprofHook::InstrumentCostUpdater(Function *pFunction) {
 
 }
 
-void AprofHook::InstrumentWrite(Value *var, Instruction *BeforeInst) {
+void AprofHook::InstrumentWrite(StoreInst * pStore, Instruction *BeforeInst) {
+
+    Value * var = pStore->getOperand(1);
 
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType()->getContainedType(0);
@@ -233,10 +241,16 @@ void AprofHook::InstrumentWrite(Value *var, Instruction *BeforeInst) {
         AttributeList void_PAL;
         void_51->setAttributes(void_PAL);
     }
+    else
+    {
+        //assert(false);
+    }
 
 }
 
-void AprofHook::InstrumentRead(Value *var, Instruction *BeforeInst) {
+void AprofHook::InstrumentRead(LoadInst * pLoad, Instruction *BeforeInst) {
+
+    Value * var = pLoad->getOperand(0);
 
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType()->getContainedType(0);
@@ -260,9 +274,14 @@ void AprofHook::InstrumentRead(Value *var, Instruction *BeforeInst) {
         AttributeList void_PAL;
         void_51->setAttributes(void_PAL);
     }
+    else
+    {
+        //pLoad->dump();
+        //assert(false);
+    }
 }
 
-void AprofHook::InstrumentAlloc(Value *var, Instruction *AfterInst) {
+void AprofHook::InstrumentAlloc(Value *var, Instruction * BeforeInst) {
 
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType();
@@ -270,12 +289,11 @@ void AprofHook::InstrumentAlloc(Value *var, Instruction *AfterInst) {
             this->pModule->getContext(),
             APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
 
-    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
-                                       "", AfterInst);
+    CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType, "", BeforeInst);
     std::vector<Value *> void_51_params;
     void_51_params.push_back(ptr_50);
     void_51_params.push_back(const_int6);
-    CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", AfterInst);
+    CallInst *void_51 = CallInst::Create(this->aprof_read, void_51_params, "", BeforeInst);
     void_51->setCallingConv(CallingConv::C);
     void_51->setTailCall(false);
     AttributeList void_PAL;
@@ -301,6 +319,21 @@ void AprofHook::InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst) {
 
 }
 
+
+void AprofHook::InstrumentRmsUpdater(Instruction * BeforeInst)
+{
+    std::vector<Value *> vecParams;
+
+    CallInst *void_49 = CallInst::Create(this->aprof_increment_rms, vecParams, "", BeforeInst);
+    void_49->setCallingConv(CallingConv::C);
+    void_49->setTailCall(false);
+    AttributeList void_PAL;
+    void_49->setAttributes(void_PAL);
+}
+
+
+
+/*
 void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
 
     BasicBlock *pEntryBlock = &(pFunction->getEntryBlock());
@@ -352,14 +385,16 @@ void AprofHook::InstrumentRmsUpdater(Function *pFunction) {
         }
     }
 }
+*/
 
-void AprofHook::InstrumentReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
+void AprofHook::InstrumentReturn(Instruction *BeforeInst) {
 
     std::vector<Value *> vecParams;
     LoadInst *bb_pLoad = new LoadInst(this->BBAllocInst, "", false, BeforeInst);
     bb_pLoad->setAlignment(8);
     vecParams.push_back(bb_pLoad);
 
+/*
     if (NeedUpdateRms) {
 
         LoadInst *rms_pLoad = new LoadInst(this->RmsAllocInst, "", false, BeforeInst);
@@ -370,6 +405,8 @@ void AprofHook::InstrumentReturn(Instruction *BeforeInst, bool NeedUpdateRms) {
 
         vecParams.push_back(this->ConstantLong0);
     }
+*/
+
 
     CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", BeforeInst);
     void_49->setCallingConv(CallingConv::C);
@@ -382,32 +419,42 @@ void AprofHook::InstrumentHooks(Function *Func) {
 
     int FuncID = GetFunctionID(Func);
 
-    bool need_update_rms = false;
+    if(FuncID <= 0)
+    {
+        errs() << Func->getName() << "\n";
+    }
+
+    assert(FuncID > 0);
+
+    //bool need_update_rms = false;
 
     if (FuncID > 0) {
-        Instruction *firstInst = &*(Func->begin()->begin());
+        //Instruction *firstInst = &*(Func->begin()->begin());
+
+        Instruction * firstInst = &*(Func->getEntryBlock().getFirstNonPHI());
+
         InstrumentCallBefore(FuncID, firstInst);
         InstrumentCostUpdater(Func);
-//        InstrumentRmsUpdater(Func);
     }
 
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
         BasicBlock *BB = &*BI;
 
-//        InstrumentCostUpdater(BB);
-
-        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
-
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) 
+        {
             Instruction *Inst = &*II;
 
-            if (GetInstructionID(Inst) == -1) {
+            if (GetInstructionID(Inst) == -1) 
+            {
                 continue;
             }
 
-            switch (Inst->getOpcode()) {
+            switch (Inst->getOpcode()) 
+            {
 
-                case Instruction::Store: {
+                case Instruction::Store: 
+                {
                     if (HasInsertFlag(Inst, WRITE)) {
                         Value *secondOp = Inst->getOperand(1);
                         Type *secondOpType = secondOp->getType();
@@ -417,7 +464,11 @@ void AprofHook::InstrumentHooks(Function *Func) {
                         }
                         // FIXME::ignore function pointer store!
                         if (!isa<FunctionType>(secondOpType)) {
-                            InstrumentWrite(secondOp, Inst);
+
+                            if(StoreInst * pStore = dyn_cast<StoreInst>(Inst))
+                            {
+                                InstrumentWrite(pStore, Inst);
+                            }
                         }
                     }
 
@@ -426,10 +477,13 @@ void AprofHook::InstrumentHooks(Function *Func) {
 
                 case Instruction::Alloca: {
                     if (HasInsertFlag(Inst, READ)) {
+                        
                         II++;
-                        Instruction *afterInst = &*II;
-                        InstrumentAlloc(Inst, afterInst);
+                        Instruction * beforeInst = &*II;
+                        InstrumentAlloc(Inst, beforeInst);
                         II--;
+
+                        ///InstrumentAlloc(Inst, beforeInst);
                     }
                     break;
                 }
@@ -438,7 +492,23 @@ void AprofHook::InstrumentHooks(Function *Func) {
                     // load instruction only has one operand !!!
                     if (HasInsertFlag(Inst, READ)) {
                         Value *firstOp = Inst->getOperand(0);
-                        InstrumentRead(firstOp, Inst);
+                        Type * firstOpType = firstOp->getType();
+
+                        while(isa<PointerType>(firstOpType))
+                        {
+                            firstOpType = firstOpType->getContainedType(0);
+                        }
+
+                        if(!isa<FunctionType>(firstOpType))
+                        {   
+                            if(LoadInst * pLoad = dyn_cast<LoadInst>(Inst))
+                            {
+                                InstrumentRead(pLoad, Inst);
+                            }
+                        }
+                        
+
+                        
                     }
 
                     break;
@@ -446,21 +516,24 @@ void AprofHook::InstrumentHooks(Function *Func) {
 
                 case Instruction::Call: {
 
+                    if(isa<MemIntrinsic>(Inst))
+                    {
+                        //assert(false);
+                    }
+
                     CallSite ci(Inst);
                     Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
 
                     // fgetc automatic rms++;
                     if (Callee && Callee->getName().str() == "fgetc") {
-                        need_update_rms = true;
-                        InstrumentRmsUpdater(Inst->getFunction());
+                        InstrumentRmsUpdater(Inst);
                     }
 
                     break;
                 }
-
                 case Instruction::Ret: {
 
-                    InstrumentReturn(Inst, need_update_rms);
+                    InstrumentReturn(Inst);
                     break;
                 }
             }
@@ -483,9 +556,8 @@ void AprofHook::SetupHooks() {
     // init all global and constants variables
     SetupInit();
 
-    for (Module::iterator FI = this->pModule->begin();
-         FI != this->pModule->end(); FI++) {
-
+    for (Module::iterator FI = this->pModule->begin(); FI != this->pModule->end(); FI++) 
+    {
         Function *Func = &*FI;
 
         if (isSampling == 1) {
@@ -499,15 +571,17 @@ void AprofHook::SetupHooks() {
         if (this->funNameIDFile)
             this->funNameIDFile << Func->getName().str()
                                 << ":" << GetFunctionID(Func) << "\n";
-
         InstrumentHooks(Func);
 
     }
 
     Function *MainFunc = this->pModule->getFunction("main");
-    if (MainFunc) {
-
-        Instruction *firstInst = &*(MainFunc->begin()->begin());
+    assert(MainFunc != NULL);
+    
+    if (MainFunc) 
+    {
+        //Instruction *firstInst = &*(MainFunc->begin()->begin());
+        Instruction * firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
         InstrumentInit(firstInst);
     }
 }
@@ -515,17 +589,14 @@ void AprofHook::SetupHooks() {
 bool AprofHook::runOnModule(Module &M) {
 
     if (strFileName.empty()) {
-
         errs() << "You not set outfile to save function name and ID." << "\n";
-
+        return false;
     } else {
-
-        this->funNameIDFile.open(
-                strFileName,
-                std::ofstream::out | std::ofstream::app);
+        this->funNameIDFile.open(strFileName, std::ofstream::out | std::ofstream::app);
     }
 
     this->pModule = &M;
     SetupHooks();
 
+    return true;
 }

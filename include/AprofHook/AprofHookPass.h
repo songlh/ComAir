@@ -38,19 +38,19 @@ struct AprofHook : public ModulePass {
 
     void InstrumentHooks(Function *);
 
-    void InstrumentWrite(Value *, Instruction *);
+    void InstrumentWrite(StoreInst *, Instruction *);
 
-    void InstrumentRead(Value *, Instruction *);
+    void InstrumentRead(LoadInst * , Instruction *);
 
     void InstrumentAlloc(Value *, Instruction *);
 
     void InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst);
 
-    void InstrumentReturn(Instruction *m, bool);
+    void InstrumentReturn(Instruction *m);
 
     void InstrumentCostUpdater(Function *pFunction);
 
-    void InstrumentRmsUpdater(Function *pFunction);
+    void InstrumentRmsUpdater(Instruction *pInst);
 
     /* Module */
     Module *pModule;

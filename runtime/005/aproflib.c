@@ -215,10 +215,11 @@ void aprof_call_before(int funcId) {
 
 }
 
-void aprof_return(unsigned long numCost, unsigned long rms) {
+//void aprof_return(unsigned long numCost, unsigned long rms) {
+void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost += numCost;
-    shadow_stack[stack_top].rms += rms;
+    //shadow_stack[stack_top].rms += rms;
 
 //    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
 //              shadow_stack[stack_top].funcId,

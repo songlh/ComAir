@@ -49,5 +49,5 @@ add_executable(testHook ${BINARY_SOURCES})
 
 # link the new hello_library target with the hello_binary target
 target_link_libraries(testHook
-        PRIVATE AProfHooks
+        PRIVATE AProfHooks m rt
         )

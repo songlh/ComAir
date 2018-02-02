@@ -174,50 +174,40 @@ void aprof_init() {
 }
 
 void aprof_write(void *memory_addr, unsigned int length) {
+
     unsigned long start_addr = (unsigned long) memory_addr;
 
     for (unsigned long i = start_addr; i < start_addr + length; i++) {
         aprof_insert_page_table(i, count);
+    }
+}
 
+void aprof_read_(unsigned long addr) {
+    unsigned long ts_w = aprof_query_page_table(addr);
+
+    if (ts_w < shadow_stack[stack_top].ts) {
+
+        shadow_stack[stack_top].rms++;
+
+        if (ts_w != 0) {
+            for (int j = stack_top; j > 0; j--) {
+                if (shadow_stack[j].ts <= ts_w) {
+                    shadow_stack[j].rms--;
+                    break;
+                }
+            }
+        }
     }
 
-//    log_trace("aprof_write: memory_adrr is %ld, lenght is %ld, value is %ld",
-//              start_addr, length, count);
-
+    aprof_insert_page_table(addr, count);
 }
 
 void aprof_read(void *memory_addr, unsigned int length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-
-//    log_trace("aprof_read: top element funcID %d", shadow_stack[stack_top].funcId);
-//    log_trace("aprof_read: top element index %d", stack_top);
-
     for (unsigned long i = start_addr; i < (start_addr + length); i++) {
-
-        // We assume that w has been wrote before reading.
-        // ts[w] > 0 and ts[w] < S[top]
-        unsigned long ts_w = aprof_query_page_table(i);
-        if (ts_w < shadow_stack[stack_top].ts) {
-
-            shadow_stack[stack_top].rms++;
-//            log_trace("aprof_read: (ts[i]) %ld < (S[top].ts) %ld",
-//                      ts_w, shadow_stack[stack_top].ts);
-
-            if (ts_w != 0) {
-                for (int j = stack_top; j > 0; j--) {
-
-                    if (shadow_stack[j].ts <= ts_w) {
-                        shadow_stack[j].rms--;
-                        break;
-                    }
-                }
-            }
-        }
-
-        aprof_insert_page_table(i, count);
+        aprof_read_(i);
     }
-
 }
 
 void aprof_increment_rms() {
@@ -236,13 +226,20 @@ void aprof_call_before(int funcId) {
 
 }
 
-void aprof_return(unsigned long numCost) {
+void aprof_return(unsigned long numCost, unsigned long rms) {
 
     shadow_stack[stack_top].cost += numCost;
+    shadow_stack[stack_top].rms += rms;
 
-//    memcpy(pBuffer, &(shadow_stack[stack_top]),
-//           struct_size);
-//    log_offset += struct_size;
+//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
+//              shadow_stack[stack_top].funcId,
+//              shadow_stack[stack_top].rms,
+//              shadow_stack[stack_top].cost
+//    );
+
+    memcpy(pBuffer+log_offset, shadow_stack[stack_top],
+           struct_size);
+    log_offset += struct_size;
 
     if (stack_top >= 1) {
 
@@ -321,7 +318,6 @@ int aprof_geo(int iRate) {
 }
 
 
-// this is test
 void PrintExecutionCost(long numCost) {
     printf("%ld", numCost);
 }

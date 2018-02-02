@@ -666,12 +666,19 @@ void BBProfiling::SetupGlobals(Module *pModule) {
 }
 
 void BBProfiling::SetupHooks(Module *pModule) {
-    vector<Type *> ArgTypes;
-    ArgTypes.push_back(this->LongType);
-    FunctionType *PrintExecutionCostType = FunctionType::get(this->VoidType, ArgTypes, false);
+    this->PrintExecutionCost = pModule->getFunction("PrintExecutionCost");
 
-    this->PrintExecutionCost = Function::Create(PrintExecutionCostType, GlobalValue::ExternalLinkage,
-                                                "PrintExecutionCost", pModule);
+    if (!this->PrintExecutionCost) {
+        vector<Type *> ArgTypes;
+        ArgTypes.push_back(this->LongType);
+        FunctionType *PrintExecutionCostType = FunctionType::get(this->VoidType, ArgTypes, false);
+
+
+        this->PrintExecutionCost = Function::Create(PrintExecutionCostType, GlobalValue::ExternalLinkage,
+                                                    "PrintExecutionCost", pModule);
+        ArgTypes.clear();
+    }
+
 }
 
 

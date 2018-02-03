@@ -20,9 +20,13 @@ static RegisterPass<MarkFlagForAprof> X(
         false, false);
 
 
+static cl::opt<int> notOptimizing("not-optimize",
+                                 cl::desc("Do not use optimizing read and write."),
+                                 cl::init(0));
+
 static cl::opt<int> isSampling("is-sampling",
-                              cl::desc("Whether to perform sampling."),
-                              cl::init(0));
+                               cl::desc("Whether to perform sampling."),
+                               cl::init(0));
 
 
 /* local functions */
@@ -160,8 +164,6 @@ void MarkFlagForAprof::MarkFlag(BasicBlock *BB, int Num) {
 
 }
 
-void MarkFlagForAprof::MarkBBUpdateFlag(Function *F) {}
-
 //void MarkFlagForAprof::MarkBBUpdateFlag(Function *F) {
 //
 //    std::stack<BasicBlock *> VisitedStack;
@@ -270,10 +272,7 @@ void MarkFlagForAprof::MarkBBUpdateFlag(Function *F) {}
 //
 //}
 
-bool MarkFlagForAprof::runOnModule(Module &M) {
-
-    setupInit(&M);
-
+void MarkFlagForAprof::OptimizeReadWrite() {
     std::map<int, std::set<Value *>> VisitedValues;
 
     for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
@@ -287,8 +286,6 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
         } else if (IsIgnoreFunc(Func)) {
             continue;
         }
-
-//        MarkBBUpdateFlag(Func);
 
         VisitedValues.clear();
 
@@ -360,6 +357,53 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
                 }
             }
         }
+    }
+}
+
+void MarkFlagForAprof::NotOptimizeReadWrite() {
+
+    for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
+        Function *Func = &*FI;
+
+        if (IsIgnoreFunc(Func)) {
+            continue;
+        }
+
+        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+            for (BasicBlock::iterator II = BI->begin(); II != BI->end(); II++) {
+                Instruction *Inst = &*II;
+
+                switch (Inst->getOpcode()) {
+//        			case Instruction::Alloca: {
+//        				markFlag(Inst, READ);
+//        				break;
+//        			}
+                    case Instruction::Load: {
+                        MarkFlag(Inst, READ);
+                        break;
+                    }
+                    case Instruction::Store: {
+                        MarkFlag(Inst, WRITE);
+                        break;
+                    }
+
+                }
+            }
+        }
+    }
+}
+
+bool MarkFlagForAprof::runOnModule(Module &M) {
+
+    setupInit(&M);
+
+    if (notOptimizing == 1) {
+
+        NotOptimizeReadWrite();
+
+    } else {
+
+        OptimizeReadWrite();
     }
 
     return false;

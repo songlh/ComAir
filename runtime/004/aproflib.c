@@ -1,8 +1,6 @@
 #include "aproflib.h"
-//#include "logger.h"
 
 // page table
-
 // L0  28-31
 // L1  19-27
 // L2  10-18
@@ -19,19 +17,89 @@ unsigned long *prev_pL3 = NULL;
 
 // page table
 unsigned long count = 0;
-unsigned long sampling_count = 0;
+
 struct stack_elem shadow_stack[STACK_SIZE];
 int stack_top = -1;
 
-
+// share memory
 int fd;
 char *pBuffer;
 unsigned int struct_size = sizeof(struct stack_elem);
 unsigned long log_offset = 0;
 
-// used to sampling
+// sampling
+unsigned long sampling_count = 0;
 static int old_value = -1;
 
+// logger
+
+static void lock(void) {
+    if (L.lock) {
+        L.lock(L.udata, 1);
+    }
+}
+
+
+static void unlock(void) {
+    if (L.lock) {
+        L.lock(L.udata, 0);
+    }
+}
+
+
+void log_set_udata(void *udata) {
+    L.udata = udata;
+}
+
+
+void log_set_lock(log_LockFn fn) {
+    L.lock = fn;
+}
+
+
+void log_set_fp(FILE *fp) {
+    L.fp = fp;
+}
+
+
+void log_set_level(int level) {
+    L.level = level;
+}
+
+
+void log_set_quiet(int enable) {
+    L.quiet = enable ? 1 : 0;
+}
+
+void log_init(FILE *fp, int level, int enable) {
+    L.fp = fp;
+    L.level = level;
+    L.quiet = enable ? 1 : 0;
+}
+
+
+void log_log(int level, const char *file, int line, const char *fmt, ...) {
+    if (level < L.level) {
+        return;
+    }
+
+    /* Acquire lock */
+    lock();
+
+    /* Log to file */
+    if (L.fp) {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(L.fp, fmt, args);
+        va_end(args);
+        fprintf(L.fp, "\n");
+    }
+
+    /* Release lock */
+    unlock();
+}
+
+// aprof api
 
 unsigned long aprof_query_page_table(unsigned long addr) {
 
@@ -113,6 +181,7 @@ void aprof_insert_page_table(unsigned long addr, unsigned long count) {
 
 }
 
+
 void aprof_destroy_memory() {
 
     // close  share memory
@@ -150,6 +219,7 @@ void aprof_destroy_memory() {
     free(pL0);
 }
 
+
 char *aprof_init_share_mem() {
 
     fd = shm_open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
@@ -164,7 +234,21 @@ char *aprof_init_share_mem() {
     return pcBuffer;
 }
 
+
+void aprof_logger_init() {
+    const char *FILENAME = "aprof_logger.txt";
+    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int QUIET = 1;
+    FILE *fp = fopen(FILENAME, "w");
+    log_init(fp, LEVEL, QUIET);
+
+}
+
+
 void aprof_init() {
+    // init logger
+    aprof_logger_init();
+
     // init memory
     pBuffer = aprof_init_share_mem();
 
@@ -173,47 +257,61 @@ void aprof_init() {
     memset(pL0, 0, sizeof(void *) * L0_TABLE_SIZE);
 }
 
-void aprof_write(void *memory_addr, unsigned int length) {
 
+void aprof_write(void *memory_addr, unsigned int length) {
     unsigned long start_addr = (unsigned long) memory_addr;
 
     for (unsigned long i = start_addr; i < start_addr + length; i++) {
         aprof_insert_page_table(i, count);
-    }
-}
 
-void aprof_read_(unsigned long addr) {
-    unsigned long ts_w = aprof_query_page_table(addr);
-
-    if (ts_w < shadow_stack[stack_top].ts) {
-
-        shadow_stack[stack_top].rms++;
-
-        if (ts_w != 0) {
-            for (int j = stack_top; j > 0; j--) {
-                if (shadow_stack[j].ts <= ts_w) {
-                    shadow_stack[j].rms--;
-                    break;
-                }
-            }
-        }
     }
 
-    aprof_insert_page_table(addr, count);
+//    log_trace("aprof_write: memory_adrr is %ld, lenght is %ld, value is %ld",
+//              start_addr, length, count);
+
 }
+
 
 void aprof_read(void *memory_addr, unsigned int length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
+
+//    log_trace("aprof_read: top element funcID %d", shadow_stack[stack_top].funcId);
+//    log_trace("aprof_read: top element index %d", stack_top);
+
     for (unsigned long i = start_addr; i < (start_addr + length); i++) {
-        aprof_read_(i);
+
+        // We assume that w has been wrote before reading.
+        // ts[w] > 0 and ts[w] < S[top]
+        unsigned long ts_w = aprof_query_page_table(i);
+        if (ts_w < shadow_stack[stack_top].ts) {
+
+            shadow_stack[stack_top].rms++;
+//            log_trace("aprof_read: (ts[i]) %ld < (S[top].ts) %ld",
+//                      ts_w, shadow_stack[stack_top].ts);
+
+            if (ts_w != 0) {
+                for (int j = stack_top; j > 0; j--) {
+
+                    if (shadow_stack[j].ts <= ts_w) {
+                        shadow_stack[j].rms--;
+                        break;
+                    }
+                }
+            }
+        }
+
+        aprof_insert_page_table(i, count);
     }
-}
-
-void aprof_increment_rms() {
-    shadow_stack[stack_top].rms++;
 
 }
+
+
+void aprof_increment_rms(unsigned long length) {
+    shadow_stack[stack_top].rms += length;
+
+}
+
 
 void aprof_call_before(int funcId) {
     count++;
@@ -226,10 +324,10 @@ void aprof_call_before(int funcId) {
 
 }
 
-void aprof_return(unsigned long numCost, unsigned long rms) {
+
+void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost += numCost;
-    shadow_stack[stack_top].rms += rms;
 
 //    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
 //              shadow_stack[stack_top].funcId,
@@ -237,9 +335,9 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 //              shadow_stack[stack_top].cost
 //    );
 
-    memcpy(pBuffer+log_offset, shadow_stack[stack_top],
-           struct_size);
-    log_offset += struct_size;
+//    memcpy(pBuffer, &(shadow_stack[stack_top]),
+//           struct_size);
+//    log_offset += struct_size;
 
     if (stack_top >= 1) {
 
@@ -254,13 +352,7 @@ void aprof_return(unsigned long numCost, unsigned long rms) {
 
 }
 
-//=========================================================================
-//= Multiplicative LCG for generating uniform(0.0, 1.0) random numbers    =
-//=   - x_n = 7^5*x_(n-1)mod(2^31 - 1)                                    =
-//=   - With x seeded to 1 the 10000th x value should be 1043618065       =
-//=   - From R. Jain, "The Art of Computer Systems Performance Analysis," =
-//=     John Wiley & Sons, 1991. (Page 443, Figure 26.2)                  =
-//=========================================================================
+
 static double aprof_rand_val(int seed) {
     const long a = 16807;  // Multiplier
     const long m = 2147483647;  // Modulus
@@ -290,11 +382,7 @@ static double aprof_rand_val(int seed) {
     return ((double) x / m);
 }
 
-//===========================================================================
-//=  Function to generate geometrically distributed random variables        =
-//=    - Input:  Probability of success p                                   =
-//=    - Output: Returns with geometrically distributed random variable     =
-//===========================================================================
+
 int aprof_geo(int iRate) {
     double p = 1 / (double) iRate;
     double z;                     // Uniform random number (0 < z < 1)
@@ -318,6 +406,7 @@ int aprof_geo(int iRate) {
 }
 
 
+// this is bb profiling
 void PrintExecutionCost(long numCost) {
     printf("%ld", numCost);
 }

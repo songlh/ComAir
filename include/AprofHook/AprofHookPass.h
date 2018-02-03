@@ -50,7 +50,9 @@ struct AprofHook : public ModulePass {
 
     void InstrumentCostUpdater(Function *pFunction);
 
-    void InstrumentRmsUpdater(Instruction *pInst);
+    void InstrumentRmsUpdater(Function *F, Instruction *pInst);
+
+    void ProcessMemIntrinsic(MemIntrinsic *memInst);
 
     /* Module */
     Module *pModule;

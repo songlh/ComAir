@@ -95,22 +95,12 @@ void AprofHook::SetupFunctions() {
         ArgTypes.clear();
     }
 
-    // aprof_increment_cost
-//    this->aprof_increment_cost = this->pModule->getFunction("aprof_increment_cost");
-//    assert(this->aprof_increment_cost != NULL);
-//
-//    if (!this->aprof_increment_cost) {
-//        FunctionType *AprofIncrementCostType = FunctionType::get(this->VoidType, ArgTypes, false);
-//        this->aprof_increment_cost = Function::Create(AprofIncrementCostType, GlobalValue::ExternalLinkage,
-//                                                      "aprof_increment_cost", this->pModule);
-//        ArgTypes.clear();
-//    }
-
     // aprof_increment_rms
     this->aprof_increment_rms = this->pModule->getFunction("aprof_increment_rms");
 //    assert(this->aprof_increment_rms != NULL);
 
     if (!this->aprof_increment_rms) {
+        ArgTypes.push_back(this->LongType);
         FunctionType *AprofIncrementRmsType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_increment_rms = Function::Create(AprofIncrementRmsType, GlobalValue::ExternalLinkage,
                                                      "aprof_increment_rms", this->pModule);
@@ -321,14 +311,46 @@ void AprofHook::InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst) {
 }
 
 
-void AprofHook::InstrumentRmsUpdater(Instruction *BeforeInst) {
+void AprofHook::InstrumentRmsUpdater(Function *F, Instruction *BeforeInst) {
+
+
+    std::string funcName = F->getName();
     std::vector<Value *> vecParams;
 
-    CallInst *void_49 = CallInst::Create(this->aprof_increment_rms, vecParams, "", BeforeInst);
-    void_49->setCallingConv(CallingConv::C);
-    void_49->setTailCall(false);
-    AttributeList void_PAL;
-    void_49->setAttributes(void_PAL);
+    if (funcName == "fgetc") {
+
+        vecParams.push_back(this->ConstantLong1);
+        CallInst *void_49 = CallInst::Create(this->aprof_increment_rms,
+                                             vecParams, "", BeforeInst);
+        void_49->setCallingConv(CallingConv::C);
+        void_49->setTailCall(false);
+        AttributeList void_PAL;
+        void_49->setAttributes(void_PAL);
+
+    }
+
+}
+
+
+void AprofHook::ProcessMemIntrinsic(MemIntrinsic *memInst) {
+
+
+    assert(memInst->getNumArgOperands() > 2);
+
+    std::vector<Value *> vecParams;
+
+    Value * lengthV = memInst->getArgOperand(2);
+
+    if (ConstantInt *sizeCpy = dyn_cast<ConstantInt>(lengthV)) {
+        vecParams.push_back(sizeCpy);
+        CallInst *void_49 = CallInst::Create(this->aprof_increment_rms,
+                                             vecParams, "", memInst);
+        void_49->setCallingConv(CallingConv::C);
+        void_49->setTailCall(false);
+        AttributeList void_PAL;
+        void_49->setAttributes(void_PAL);
+    }
+
 }
 
 
@@ -392,20 +414,6 @@ void AprofHook::InstrumentReturn(Instruction *BeforeInst) {
     LoadInst *bb_pLoad = new LoadInst(this->BBAllocInst, "", false, BeforeInst);
     bb_pLoad->setAlignment(8);
     vecParams.push_back(bb_pLoad);
-
-/*
-    if (NeedUpdateRms) {
-
-        LoadInst *rms_pLoad = new LoadInst(this->RmsAllocInst, "", false, BeforeInst);
-        rms_pLoad->setAlignment(8);
-        vecParams.push_back(rms_pLoad);
-
-    } else {
-
-        vecParams.push_back(this->ConstantLong0);
-    }
-*/
-
 
     CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", BeforeInst);
     void_49->setCallingConv(CallingConv::C);
@@ -504,22 +512,22 @@ void AprofHook::InstrumentHooks(Function *Func) {
                 case Instruction::Call: {
 
                     if (isa<MemIntrinsic>(Inst)) {
-                        //assert(false);
+                        ProcessMemIntrinsic(dyn_cast<MemIntrinsic>(Inst));
+                        break;
                     }
 
                     CallSite ci(Inst);
                     Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
 
                     // fgetc automatic rms++;
-                    if (Callee && Callee->getName().str() == "fgetc") {
-                        InstrumentRmsUpdater(Inst);
+                    if (Callee) {
+                        InstrumentRmsUpdater(Callee, Inst);
                     }
 
                     break;
                 }
 
                 case Instruction::Ret: {
-
                     InstrumentReturn(Inst);
                     break;
                 }

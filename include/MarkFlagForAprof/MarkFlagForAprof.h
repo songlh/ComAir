@@ -26,6 +26,9 @@ struct MarkFlagForAprof : public ModulePass {
     void MarkBBUpdateFlag(Function *);
     void MarkInstFlag(Instruction *);
 
+    void OptimizeReadWrite();
+    void NotOptimizeReadWrite();
+
     void setupInit(Module *M);
     void setupTypes();
 

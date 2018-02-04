@@ -25,79 +25,11 @@ int stack_top = -1;
 int fd;
 char *pBuffer;
 unsigned int struct_size = sizeof(struct stack_elem);
-unsigned long log_offset = 0;
 
 // sampling
 unsigned long sampling_count = 0;
 static int old_value = -1;
 
-// logger
-
-static void lock(void) {
-    if (L.lock) {
-        L.lock(L.udata, 1);
-    }
-}
-
-
-static void unlock(void) {
-    if (L.lock) {
-        L.lock(L.udata, 0);
-    }
-}
-
-
-void log_set_udata(void *udata) {
-    L.udata = udata;
-}
-
-
-void log_set_lock(log_LockFn fn) {
-    L.lock = fn;
-}
-
-
-void log_set_fp(FILE *fp) {
-    L.fp = fp;
-}
-
-
-void log_set_level(int level) {
-    L.level = level;
-}
-
-
-void log_set_quiet(int enable) {
-    L.quiet = enable ? 1 : 0;
-}
-
-void log_init(FILE *fp, int level, int enable) {
-    L.fp = fp;
-    L.level = level;
-    L.quiet = enable ? 1 : 0;
-}
-
-
-void log_log(int level, const char *file, int line, const char *fmt, ...) {
-    if (level < L.level) {
-        return;
-    }
-
-    /* Acquire lock */
-    lock();
-
-    /* Log to file */
-    if (L.fp) {
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(L.fp, fmt, args);
-        va_end(args);
-        fprintf(L.fp, "\n");
-    }
-
-    /* Release lock */
-    unlock();
-}
 
 // aprof api
 
@@ -235,21 +167,9 @@ char *aprof_init_share_mem() {
 }
 
 
-void aprof_logger_init() {
-    const char *FILENAME = "aprof_logger.txt";
-    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
-    int QUIET = 1;
-    FILE *fp = fopen(FILENAME, "w");
-    log_init(fp, LEVEL, QUIET);
-
-}
-
-
 void aprof_init() {
-    // init logger
-    aprof_logger_init();
 
-    // init memory
+    // init share memory
     pBuffer = aprof_init_share_mem();
 
     // init page table
@@ -258,7 +178,7 @@ void aprof_init() {
 }
 
 
-void aprof_write(void *memory_addr, unsigned int length) {
+void aprof_write(void *memory_addr, unsigned long length) {
     unsigned long start_addr = (unsigned long) memory_addr;
 
     for (unsigned long i = start_addr; i < start_addr + length; i++) {
@@ -266,18 +186,12 @@ void aprof_write(void *memory_addr, unsigned int length) {
 
     }
 
-//    log_trace("aprof_write: memory_adrr is %ld, lenght is %ld, value is %ld",
-//              start_addr, length, count);
-
 }
 
 
-void aprof_read(void *memory_addr, unsigned int length) {
+void aprof_read(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-
-//    log_trace("aprof_read: top element funcID %d", shadow_stack[stack_top].funcId);
-//    log_trace("aprof_read: top element index %d", stack_top);
 
     for (unsigned long i = start_addr; i < (start_addr + length); i++) {
 
@@ -287,8 +201,6 @@ void aprof_read(void *memory_addr, unsigned int length) {
         if (ts_w < shadow_stack[stack_top].ts) {
 
             shadow_stack[stack_top].rms++;
-//            log_trace("aprof_read: (ts[i]) %ld < (S[top].ts) %ld",
-//                      ts_w, shadow_stack[stack_top].ts);
 
             if (ts_w != 0) {
                 for (int j = stack_top; j > 0; j--) {
@@ -329,15 +241,8 @@ void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost += numCost;
 
-//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-//              shadow_stack[stack_top].funcId,
-//              shadow_stack[stack_top].rms,
-//              shadow_stack[stack_top].cost
-//    );
-
-//    memcpy(pBuffer, &(shadow_stack[stack_top]),
-//           struct_size);
-//    log_offset += struct_size;
+    memcpy(pBuffer, &(shadow_stack[stack_top]), struct_size);
+    pBuffer += struct_size;
 
     if (stack_top >= 1) {
 

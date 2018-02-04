@@ -23,14 +23,14 @@ target_include_directories(AProfHooks
 
 # Source fles for the binary
 set(BINARY_SOURCES
-        src/log_mem_to_file.c
+        src/logmf.c
         )
 
 # Add an executable with the above sources
 add_executable(AprofLogMem ${BINARY_SOURCES})
 
 # link the new hello_library target with the hello_binary target
-target_link_libraries(AprofLogMem rt)
+target_link_libraries(AprofLogMem AProfHooks m rt)
 
 
 ## TODO: this is for testing runtime lib.

@@ -16,11 +16,13 @@ void read_shared_momery() {
 
     puts("start reading data....");
     memcpy(&Ele, ptr, sizeof(Ele));
-    printf("%ld\n", Ele.rms);
-    memcpy(&Ele, ptr+sizeof(Ele), sizeof(Ele));
-    printf("%ld\n", Ele.rms);
-    memcpy(&Ele, ptr+(sizeof(Ele) * 3), sizeof(Ele));
-    printf("%ld\n", Ele.rms);
+
+    while (Ele.funcId > 0) {
+        printf("%d\n", Ele.funcId);
+        ptr += sizeof(Ele);
+        memcpy(&Ele, ptr, sizeof(Ele));
+    }
+
     puts("read over");
     shm_unlink(APROF_MEM_LOG);
     close(fd);
@@ -29,12 +31,15 @@ void read_shared_momery() {
 
 int main() {
 
-//    aprof_init();
-//    aprof_call_before(1);
-//    aprof_call_before(2);
-//
-//    aprof_return(3, 10);
-//    aprof_return(2, 3);
+    aprof_init();
+    aprof_call_before(1);
+    aprof_call_before(2);
+
+    aprof_increment_rms(10);
+    aprof_increment_rms(5);
+
+    aprof_return(3);
+    aprof_return(2);
     read_shared_momery();
     return 0;
 }

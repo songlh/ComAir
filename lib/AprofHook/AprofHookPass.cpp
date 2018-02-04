@@ -114,7 +114,7 @@ void AprofHook::SetupFunctions() {
 
     if (!this->aprof_write) {
         ArgTypes.push_back(this->VoidPointerType);
-        ArgTypes.push_back(this->IntType);
+        ArgTypes.push_back(this->LongType);
         FunctionType *AprofWriteType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_write = Function::Create(AprofWriteType, GlobalValue::ExternalLinkage, "aprof_write",
                                              this->pModule);
@@ -128,7 +128,7 @@ void AprofHook::SetupFunctions() {
 
     if (!this->aprof_read) {
         ArgTypes.push_back(this->VoidPointerType);
-        ArgTypes.push_back(this->IntType);
+        ArgTypes.push_back(this->LongType);
         FunctionType *AprofReadType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_read = Function::Create(AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
         this->aprof_read->setCallingConv(CallingConv::C);
@@ -216,7 +216,7 @@ void AprofHook::InstrumentWrite(StoreInst *pStore, Instruction *BeforeInst) {
 
         ConstantInt *const_int6 = ConstantInt::get(
                 this->pModule->getContext(),
-                APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+                APInt(64, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
 
         CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
                                            "", BeforeInst);
@@ -252,7 +252,7 @@ void AprofHook::InstrumentRead(LoadInst *pLoad, Instruction *BeforeInst) {
     if (type_1->isSized()) {
         ConstantInt *const_int6 = ConstantInt::get(
                 this->pModule->getContext(),
-                APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+                APInt(64, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
 
         CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
                                            "", BeforeInst);
@@ -278,7 +278,7 @@ void AprofHook::InstrumentAlloc(Value *var, Instruction *BeforeInst) {
     Type *type_1 = var->getType();
     ConstantInt *const_int6 = ConstantInt::get(
             this->pModule->getContext(),
-            APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+            APInt(64, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
 
     CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType, "", BeforeInst);
     std::vector<Value *> void_51_params;
@@ -331,28 +331,111 @@ void AprofHook::InstrumentRmsUpdater(Function *F, Instruction *BeforeInst) {
 
 }
 
+bool isI8PointerType(Value *val) {
+
+    Type *targetType = val->getType();
+    if (!targetType->isPointerTy()) {
+        return false;
+    }
+
+    if (IntegerType *IT = dyn_cast<IntegerType>(targetType->getPointerElementType())) {
+        if (IT->getBitWidth() == 8)
+            return true;
+    }
+
+    return false;
+
+}
+
 
 void AprofHook::ProcessMemIntrinsic(MemIntrinsic *memInst) {
-
 
     assert(memInst->getNumArgOperands() > 2);
 
     std::vector<Value *> vecParams;
 
-    Value * lengthV = memInst->getArgOperand(2);
+    Value *argDest = memInst->getArgOperand(0);
+    Value *argSrc = memInst->getArgOperand(1);
+    Value *lengthV = memInst->getArgOperand(2);
+    ConstantInt *sizeCpy = dyn_cast<ConstantInt>(lengthV);
 
-    if (ConstantInt *sizeCpy = dyn_cast<ConstantInt>(lengthV)) {
-        vecParams.push_back(sizeCpy);
-        CallInst *void_49 = CallInst::Create(this->aprof_increment_rms,
-                                             vecParams, "", memInst);
-        void_49->setCallingConv(CallingConv::C);
-        void_49->setTailCall(false);
+    if (!isI8PointerType(argDest)) {
+        if (GetElementPtrInst *getDestPtr = dyn_cast<GetElementPtrInst>(argDest)) {
+
+            argDest = getDestPtr->getOperand(0);
+
+        } else {
+
+            if (ConstantExpr *argDestExpr = dyn_cast<ConstantExpr>(argDest)) {
+
+                assert(argDestExpr->getNumOperands() > 0);
+                argDest = argDestExpr->getOperand(0);
+
+            } else {
+
+                errs() << "Error in get dest address .... \n";
+                memInst->dump();
+                argDest->dump();
+                assert(false);
+
+            }
+        }
+    }
+
+
+    if (sizeCpy) {
+
         AttributeList void_PAL;
-        void_49->setAttributes(void_PAL);
+
+        if (isa<MemCpyInst>(memInst) || isa<MemMoveInst>(memInst)) {
+
+            if (!isI8PointerType(argSrc)) {
+                if (GetElementPtrInst *getSrcPtr = dyn_cast<GetElementPtrInst>(argSrc)) {
+
+                    argSrc = getSrcPtr->getOperand(0);
+
+                } else {
+
+                    if (ConstantExpr *argSrcExpr = dyn_cast<ConstantExpr>(argSrc)) {
+                        assert(argSrcExpr->getNumOperands() > 0);
+
+                        argSrc = argSrcExpr->getOperand(0);
+
+                    } else {
+
+                        errs() << "Error in get src address .... \n";
+                        memInst->dump();
+                        argSrc->dump();
+                        return;
+                        assert(false);
+                    }
+                }
+            }
+
+            // read first
+            vecParams.clear();
+            CastInst *ptr_read = new BitCastInst(argSrc, this->VoidPointerType, "", memInst);
+            vecParams.push_back(ptr_read);
+            vecParams.push_back(sizeCpy);
+            CallInst *void_read = CallInst::Create(this->aprof_read, vecParams, "", memInst);
+            void_read->setCallingConv(CallingConv::C);
+            void_read->setTailCall(false);
+            void_read->setAttributes(void_PAL);
+        }
+
+        // write
+        vecParams.clear();
+        CastInst *ptr_write = new BitCastInst(argDest, this->VoidPointerType,
+                                              "", memInst);
+        vecParams.push_back(ptr_write);
+        vecParams.push_back(sizeCpy);
+        CallInst *void_write = CallInst::Create(this->aprof_write, vecParams, "", memInst);
+        void_write->setCallingConv(CallingConv::C);
+        void_write->setTailCall(false);
+        void_write->setAttributes(void_PAL);
     }
 
 }
-
 
 /*
 void AprofHook::InstrumentRmsUpdater(Function *pFunction) {

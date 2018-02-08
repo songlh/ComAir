@@ -16,44 +16,52 @@ int GetFunctionID(Function *F) {
         return -1;
     }
 
-    Instruction *I = &*(F->begin()->begin());
+    BasicBlock *EntryBB = &(F->getEntryBlock());
 
-    MDNode *Node = I->getMetadata("func_id");
-    if (!Node) {
-        return -1;
-    }
+    if (EntryBB) {
 
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
+        for (BasicBlock::iterator II = EntryBB->begin(); II != EntryBB->end(); II++) {
+            Instruction *Inst = &*II;
+            MDNode *Node = Inst->getMetadata("func_id");
+            if (!Node) {
+                continue;
+            }
+            assert(Node->getNumOperands() == 1);
+            const Metadata *MD = Node->getOperand(0);
+            if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
+                Value *V = MDV->getValue();
+                ConstantInt *CI = dyn_cast<ConstantInt>(V);
+                assert(CI);
+                return CI->getZExtValue();
+            }
+        }
     }
 
     return -1;
 }
 
 int GetBasicBlockID(BasicBlock *BB) {
+
     if (BB->begin() == BB->end()) {
         return -1;
     }
 
-    Instruction *I = &*(BB->begin());
+    for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+        Instruction *I = &*II;
 
-    MDNode *Node = I->getMetadata("bb_id");
-    if (!Node) {
-        return -1;
-    }
+        MDNode *Node = I->getMetadata("bb_id");
+        if (!Node) {
+            continue;
+        }
 
-    assert(Node->getNumOperands() == 1);
-    const Metadata *MD = Node->getOperand(0);
-    if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
-        Value *V = MDV->getValue();
-        ConstantInt *CI = dyn_cast<ConstantInt>(V);
-        assert(CI);
-        return CI->getZExtValue();
+        assert(Node->getNumOperands() == 1);
+        const Metadata *MD = Node->getOperand(0);
+        if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
+            Value *V = MDV->getValue();
+            ConstantInt *CI = dyn_cast<ConstantInt>(V);
+            assert(CI);
+            return CI->getZExtValue();
+        }
     }
 
     return -1;
@@ -97,9 +105,36 @@ int GetInstructionInsertFlag(Instruction *II) {
     return -1;
 }
 
+bool getIgnoreFlag(Function *F) {
+
+    if (F->begin() == F->end()) {
+        return true;
+    }
+
+    BasicBlock *entryBB = &*(F->begin());
+    if (entryBB) {
+
+        Instruction *II = &*(entryBB->getFirstInsertionPt());
+        MDNode *Node = II->getMetadata(IGNORE_FUNC_FLAG);
+
+        if (!Node) {
+            return false;
+        }
+
+        return true;
+    }
+
+    return false;
+
+}
+
 bool IsIgnoreFunc(Function *F) {
 
     if (!F) {
+        return true;
+    }
+
+    if (getIgnoreFlag(F)) {
         return true;
     }
 
@@ -142,7 +177,7 @@ bool IsClonedFunc(Function *F) {
     }
 
     if (funcName.length() > 7 &&
-            funcName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+        funcName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
         return true;
     }
 

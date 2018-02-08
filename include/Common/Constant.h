@@ -14,6 +14,7 @@ enum {
 };
 
 #define BB_COST_FLAG "bb_cost_flag"
+#define IGNORE_FUNC_FLAG "ignore_func_flag"
 
 #define CLONE_FUNCTION_PREFIX "$aprof$"
 

@@ -119,7 +119,7 @@ void read_shared_momery() {
 
 int main() {
 
-    const char *FILENAME = "aprof_logger.txt";
+    const char *FILENAME = "/tmp/aprof_logger.txt";
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, 4, QUIET);

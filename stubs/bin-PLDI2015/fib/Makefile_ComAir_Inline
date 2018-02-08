@@ -1,5 +1,5 @@
 CXX=clang++
-CFLAGS=-O2 -Xclang -disable-O0-optnone -g -flto
+CFLAGS=-flto -O2 -Xclang -disable-O0-optnone -g
 LDFLAGS=-use-gold-plugin -Wl,-plugin-opt=save-temps
 TARGET=target
 
@@ -11,7 +11,7 @@ INLINE_PASS=cmake-build-debug/lib/MakeFunctionInline/libMakeFunctionInlinePass.s
 
 RUNTIME_LIB=stubs/runtime/aproflib.bc
 
-all: target aproflib.inline.bc target.aprof.inline
+all: target target.aprof.inline
 
 target: target.bc
 	${CXX} ${CFLAGS} ${LDFLAGS} target.bc -o target
@@ -22,14 +22,14 @@ target.aprof.inline: target.inline.bc
 target.inline.bc: target.pre.inline.bc
 	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 0 target.pre.inline.bc > target.inline.bc
 
-target.pre.inline.bc: target.aprof.bc
-	llvm-link aproflib.inline.bc target.aprof.bc -o target.pre.inline.bc
+#target.inline.bc: target.aprof.bc
+#	llvm-link ${HOME_PATH}/${RUNTIME_LIB} target.aprof.bc -o target.inline.bc
 
-aproflib.inline.bc: ${HOME_PATH}/${RUNTIME_LIB}
-	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 1 ${HOME_PATH}/${RUNTIME_LIB} > aproflib.inline.bc
+#aproflib.inline.bc: ${HOME_PATH}/${RUNTIME_LIB}
+#	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 1 ${HOME_PATH}/${RUNTIME_LIB} > aproflib.inline.bc
 
 target.aprof.bc: target.mark.id.bc
-	opt -load ${HOME_PATH}/${APROF_PASS} -instrument-hooks -strFileName telnet_func_name_id.txt target.mark.id.bc > target.aprof.bc
+	opt -load ${HOME_PATH}/${APROF_PASS} -instrument-hooks -strFileName fib_func_name_id.txt target.mark.id.bc > target.aprof.bc
 
 target.mark.id.bc: target.bc.id
 	opt -load ${HOME_PATH}/${MARK_PASS} -mark-flags target.bc.id > target.mark.id.bc

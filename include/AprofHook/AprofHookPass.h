@@ -44,13 +44,14 @@ struct AprofHook : public ModulePass {
 
     void InstrumentAlloc(Value *, Instruction *);
 
-    void InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst);
+    void InstrumentCallBefore(Function *pFunction);
 
     void InstrumentReturn(Instruction *m);
 
     void InstrumentCostUpdater(Function *pFunction);
 
-    void InstrumentRmsUpdater(Function *F, Instruction *pInst);
+    void InstrumentRmsUpdater(Function *pFunction);
+    void InstrumentRmsUpdater(Function *Callee, Instruction *pInst);
 
     void ProcessMemIntrinsic(MemIntrinsic *memInst);
 

@@ -25,7 +25,6 @@ int stack_top = -1;
 int fd;
 char *pBuffer;
 unsigned int struct_size = sizeof(struct stack_elem);
-unsigned long log_offset = 0;
 
 // sampling
 unsigned long sampling_count = 0;
@@ -39,33 +38,27 @@ static void lock(void) {
     }
 }
 
-
 static void unlock(void) {
     if (L.lock) {
         L.lock(L.udata, 0);
     }
 }
 
-
 void log_set_udata(void *udata) {
     L.udata = udata;
 }
-
 
 void log_set_lock(log_LockFn fn) {
     L.lock = fn;
 }
 
-
 void log_set_fp(FILE *fp) {
     L.fp = fp;
 }
 
-
 void log_set_level(int level) {
     L.level = level;
 }
-
 
 void log_set_quiet(int enable) {
     L.quiet = enable ? 1 : 0;
@@ -76,7 +69,6 @@ void log_init(FILE *fp, int level, int enable) {
     L.level = level;
     L.quiet = enable ? 1 : 0;
 }
-
 
 void log_log(int level, const char *file, int line, const char *fmt, ...) {
     if (level < L.level) {
@@ -99,6 +91,15 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
     unlock();
 }
 
+void aprof_logger_init() {
+    const char *FILENAME = "aprof_logger.txt";
+    int LEVEL = 1;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int QUIET = 1;
+    FILE *fp = fopen(FILENAME, "w");
+    log_init(fp, LEVEL, QUIET);
+
+}
+
 // aprof api
 
 unsigned long aprof_query_page_table(unsigned long addr) {
@@ -114,7 +115,7 @@ unsigned long aprof_query_page_table(unsigned long addr) {
         return 0;
     }
 
-    pL1 = pL0[tmp];
+    pL1 = (void **) pL0[tmp];
 
     tmp = (addr & L1_MASK) >> 19;
 
@@ -122,7 +123,7 @@ unsigned long aprof_query_page_table(unsigned long addr) {
         return 0;
     }
 
-    pL2 = pL1[tmp];
+    pL2 = (void **) pL1[tmp];
 
     tmp = (addr & L2_MASK) >> 10;
 
@@ -154,16 +155,17 @@ void aprof_insert_page_table(unsigned long addr, unsigned long count) {
         memset(pL0[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
     }
 
-    pL1 = pL0[tmp];
+    pL1 = (void **) pL0[tmp];
 
     tmp = (addr & L1_MASK) >> 19;
 
     if (pL1[tmp] == NULL) {
+
         pL1[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
         memset(pL1[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
     }
 
-    pL2 = pL1[tmp];
+    pL2 = (void **) pL1[tmp];
 
     tmp = (addr & L2_MASK) >> 10;
 
@@ -235,63 +237,54 @@ char *aprof_init_share_mem() {
 }
 
 
-void aprof_logger_init() {
-    const char *FILENAME = "aprof_logger.txt";
-    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
-    int QUIET = 1;
-    FILE *fp = fopen(FILENAME, "w");
-    log_init(fp, LEVEL, QUIET);
-
-}
-
-
 void aprof_init() {
-    // init logger
+
+    // init share memory
+//    pBuffer = aprof_init_share_mem();
     aprof_logger_init();
-
-    // init memory
-    pBuffer = aprof_init_share_mem();
-
     // init page table
     pL0 = (void **) malloc(sizeof(void *) * L0_TABLE_SIZE);
     memset(pL0, 0, sizeof(void *) * L0_TABLE_SIZE);
 }
 
 
-void aprof_write(void *memory_addr, unsigned int length) {
+void aprof_write(void *memory_addr, unsigned long length) {
     unsigned long start_addr = (unsigned long) memory_addr;
+    unsigned long i = start_addr;
+    unsigned long end_addr = start_addr + 1;
 
-    for (unsigned long i = start_addr; i < start_addr + length; i++) {
+    for (; i < end_addr; i++) {
         aprof_insert_page_table(i, count);
 
     }
 
-//    log_trace("aprof_write: memory_adrr is %ld, lenght is %ld, value is %ld",
-//              start_addr, length, count);
+    log_trace("aprof_write: funcID %d, memory_adrr is %ld, lenght is %ld",
+              shadow_stack[stack_top].funcId, start_addr, length);
 
 }
 
 
-void aprof_read(void *memory_addr, unsigned int length) {
+void aprof_read(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
+    unsigned long i = start_addr;
+    unsigned long end_addr = start_addr + 1;
+    int j;
 
-//    log_trace("aprof_read: top element funcID %d", shadow_stack[stack_top].funcId);
-//    log_trace("aprof_read: top element index %d", stack_top);
+    log_trace("aprof_read: funcID %d, memory_adrr is %ld, lenght is %ld",
+              shadow_stack[stack_top].funcId, start_addr, length);
 
-    for (unsigned long i = start_addr; i < (start_addr + length); i++) {
+    for (; i < end_addr; i++) {
 
         // We assume that w has been wrote before reading.
         // ts[w] > 0 and ts[w] < S[top]
         unsigned long ts_w = aprof_query_page_table(i);
-        if (ts_w < shadow_stack[stack_top].ts) {
+        if (stack_top > -1 && ts_w < shadow_stack[stack_top].ts) {
 
             shadow_stack[stack_top].rms++;
-//            log_trace("aprof_read: (ts[i]) %ld < (S[top].ts) %ld",
-//                      ts_w, shadow_stack[stack_top].ts);
 
             if (ts_w != 0) {
-                for (int j = stack_top; j > 0; j--) {
+                for (j = stack_top; j > 0; j--) {
 
                     if (shadow_stack[j].ts <= ts_w) {
                         shadow_stack[j].rms--;
@@ -321,6 +314,8 @@ void aprof_call_before(int funcId) {
     shadow_stack[stack_top].rms = 0;
     // newEle->cost update in aprof_return
     shadow_stack[stack_top].cost = 0;
+    log_debug("aprof_call_before: funcID %d",
+              shadow_stack[stack_top].funcId);
 
 }
 
@@ -329,15 +324,13 @@ void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost += numCost;
 
-//    log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-//              shadow_stack[stack_top].funcId,
-//              shadow_stack[stack_top].rms,
-//              shadow_stack[stack_top].cost
-//    );
-
-//    memcpy(pBuffer, &(shadow_stack[stack_top]),
-//           struct_size);
-//    log_offset += struct_size;
+//    memcpy(pBuffer, &(shadow_stack[stack_top]), struct_size);
+//    pBuffer += struct_size;
+    log_fatal("aprof_return: ID %d ; RMS %ld ; Cost %ld ;",
+              shadow_stack[stack_top].funcId,
+              shadow_stack[stack_top].rms,
+              shadow_stack[stack_top].cost
+    );
 
     if (stack_top >= 1) {
 
@@ -348,6 +341,8 @@ void aprof_return(unsigned long numCost) {
     } else {
         // destroy  memory.
         aprof_destroy_memory();
+        log_debug("aprof_return: last funcID %d",
+                  shadow_stack[stack_top].funcId);
     }
 
 }

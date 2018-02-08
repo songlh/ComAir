@@ -30,21 +30,11 @@
 
 #define STACK_SIZE 2000
 
-void aprof_init_page_table();
-
-unsigned long aprof_query_page_table(unsigned long address);
-
-void aprof_insert_page_table(unsigned long address, unsigned long count);
-
-void aprof_destroy_memory();
-
 /*---- end ----*/
 
 /*---- share memory ---- */
 #define BUFFERSIZE (unsigned long) 1 << 33
 #define APROF_MEM_LOG "/aprof_log.log"
-
-char * aprof_init_share_mem();
 
 /*---- end ----*/
 
@@ -56,6 +46,19 @@ struct stack_elem {
     unsigned long long rms;
     unsigned long long cost;
 };
+
+#ifdef __cplusplus
+extern "C" {
+
+void aprof_init_page_table();
+
+unsigned long aprof_query_page_table(unsigned long address);
+
+void aprof_insert_page_table(unsigned long address, unsigned long count);
+
+void aprof_destroy_memory();
+
+char *aprof_init_share_mem();
 
 void aprof_init();
 
@@ -95,5 +98,8 @@ int aprof_geo(int iRate);            // Returns a geometric random variable
 static double aprof_rand_val(int seed);    // Jain's RNG
 
 /*---- end ----*/
+
+};
+#endif
 
 #endif

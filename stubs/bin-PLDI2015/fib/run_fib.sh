@@ -48,19 +48,19 @@ do_not_sampling () {
 
  /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/IDAssigner/libIDAssignerPass.so -tag-id ${BC_FILE} > ${BC_ID_FILE}
 
- /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/MarkFlagForAprof/libMarkFlagForAprofPass.so -mark-flags -is-sampling 0  ${BC_ID_FILE} > ${BC_MARK_FILE}
+ /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/MarkFlagForAprof/libMarkFlagForAprofPass.so -mark-flags ${BC_ID_FILE} > ${BC_MARK_FILE}
 
- /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/AprofHook/libAProfHookPass.so -instrument-hooks -strFileName func_name_id.log -is-sampling 0 ${BC_MARK_FILE} > ${BC_PROF_FILE}
+ /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/AprofHook/libAProfHookPass.so -instrument-hooks -strFileName func_name_id.log  ${BC_MARK_FILE} > ${BC_PROF_FILE}
 
  /HDD/llvm5.0/install/bin/llvm-dis  ${BC_PROF_FILE}
 
  /HDD/llvm5.0/install/bin/llc -filetype=obj ${BC_PROF_FILE} -o ${O_PROF_FILE}
 
  # link c++
- /HDD/llvm5.0/install/bin/clang++ -O2 ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lm -lrt
+ /HDD/llvm5.0/install/bin/clang++ -O0 ${O_PROF_FILE} ${RUNTIME_LIB}  -lm -lrt
 
  # test one time
- ./a.out 3
+ ./a.out 5
 
  # run some times and calculate result
  # python run_fib.py

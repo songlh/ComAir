@@ -20,8 +20,9 @@ struct MarkFlagForAprof : public ModulePass {
 
     virtual bool runOnModule(Module &M);
 
-    void MarkFlag(BasicBlock *, int);
+    void MarkIgnoreFuncFlag(Function *);
     void MarkFlag(Instruction *, int);
+    void MarkFlag(BasicBlock *, int);
 
     void MarkBBUpdateFlag(Function *);
     void MarkInstFlag(Instruction *);

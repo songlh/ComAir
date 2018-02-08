@@ -292,8 +292,10 @@ void AprofHook::InstrumentAlloc(Value *var, Instruction *BeforeInst) {
 
 }
 
-void AprofHook::InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst) {
+void AprofHook::InstrumentCallBefore(Function *F) {
+    int FuncID = GetFunctionID(F);
     std::vector<Value *> vecParams;
+    Instruction *firstInst = &*(F->getEntryBlock().getFirstNonPHI());
 
     ConstantInt *const_int6 = ConstantInt::get(
             this->pModule->getContext(),
@@ -302,7 +304,7 @@ void AprofHook::InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst) {
     vecParams.push_back(const_int6);
 
     CallInst *void_46 = CallInst::Create(
-            this->aprof_call_before, vecParams, "", BeforeCallInst);
+            this->aprof_call_before, vecParams, "", firstInst);
     void_46->setCallingConv(CallingConv::C);
     void_46->setTailCall(false);
     AttributeList void_PAL;
@@ -310,6 +312,37 @@ void AprofHook::InstrumentCallBefore(int FuncID, Instruction *BeforeCallInst) {
 
 }
 
+/*
+ * This is used to add function arguments contribute rms
+ */
+void AprofHook::InstrumentRmsUpdater(Function *F) {
+
+    if (F->arg_size() > 0) {
+        DataLayout *dl = new DataLayout(this->pModule);
+        int add_rms = 0;
+        for (Function::arg_iterator argIt = F->arg_begin(); argIt != F->arg_end(); argIt++) {
+            Argument *argument = argIt;
+
+            Type *argType = argument->getType();
+            add_rms += dl->getTypeAllocSize(argType);
+        }
+
+        Instruction *firstInst = &*(F->getEntryBlock().getFirstNonPHI());
+        std::vector<Value *> vecParams;
+        ConstantInt *const_rms = ConstantInt::get(
+                this->pModule->getContext(),
+                APInt(64, StringRef(std::to_string(add_rms)), 10));
+
+        vecParams.push_back(const_rms);
+        CallInst *void_49 = CallInst::Create(this->aprof_increment_rms,
+                                             vecParams, "", firstInst);
+        void_49->setCallingConv(CallingConv::C);
+        void_49->setTailCall(false);
+        AttributeList void_PAL;
+        void_49->setAttributes(void_PAL);
+    }
+
+}
 
 void AprofHook::InstrumentRmsUpdater(Function *F, Instruction *BeforeInst) {
 
@@ -518,12 +551,11 @@ void AprofHook::InstrumentHooks(Function *Func) {
     //bool need_update_rms = false;
 
     if (FuncID > 0) {
-        //Instruction *firstInst = &*(Func->begin()->begin());
 
-        Instruction *firstInst = &*(Func->getEntryBlock().getFirstNonPHI());
-
-        InstrumentCallBefore(FuncID, firstInst);
+        // be carefull, there must be this order!
         InstrumentCostUpdater(Func);
+        InstrumentRmsUpdater(Func);
+        InstrumentCallBefore(Func);
     }
 
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
@@ -660,6 +692,29 @@ void AprofHook::SetupHooks() {
         //Instruction *firstInst = &*(MainFunc->begin()->begin());
         Instruction *firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
         InstrumentInit(firstInst);
+
+        // this is make sure main function has call before,
+        // so the shadow stack will not empty in running.
+        BasicBlock *EntryBB = &(MainFunc->getEntryBlock());
+        bool hasCallBefore = false;
+
+        for (BasicBlock::iterator II = EntryBB->begin(); II != EntryBB->end(); II++) {
+            Instruction *Inst = &*II;
+
+            if (Inst->getOpcode() == Instruction::Call) {
+                CallSite ci(Inst);
+                Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
+
+                if (Callee->getName() == "aprof_call_before") {
+                    hasCallBefore = true;
+                    break;
+                }
+            }
+        }
+
+        if (!hasCallBefore) {
+            InstrumentCallBefore(MainFunc);
+        }
     }
 }
 

@@ -182,7 +182,7 @@ void aprof_init() {
 void aprof_write(void *memory_addr, unsigned long length) {
     unsigned long start_addr = (unsigned long) memory_addr;
     unsigned long i = start_addr;
-    unsigned long end_addr = start_addr + 1;
+    unsigned long end_addr = start_addr + length;
 
     for (; i < end_addr; i++) {
         aprof_insert_page_table(i, count);
@@ -196,10 +196,10 @@ void aprof_read(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
     unsigned long i = start_addr;
-    unsigned long end_addr = start_addr + 1;
+    unsigned long end_addr = start_addr + length;
     int j;
 
-    for (unsigned long i = start_addr; i < (start_addr + length); i++) {
+    for (; i < end_addr; i++) {
 
         // We assume that w has been wrote before reading.
         // ts[w] > 0 and ts[w] < S[top]

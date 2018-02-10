@@ -36,11 +36,11 @@ struct AprofHook : public ModulePass {
 
     void InstrumentInit(Instruction *);
 
-    void InstrumentHooks(Function *);
+    void InstrumentHooks(Function *, bool isOptimized = true);
 
     void InstrumentWrite(StoreInst *, Instruction *);
 
-    void InstrumentRead(LoadInst * , Instruction *);
+    void InstrumentRead(LoadInst *, Instruction *);
 
     void InstrumentAlloc(Value *, Instruction *);
 
@@ -48,9 +48,10 @@ struct AprofHook : public ModulePass {
 
     void InstrumentReturn(Instruction *m);
 
-    void InstrumentCostUpdater(Function *pFunction);
+    void InstrumentCostUpdater(Function *pFunction, bool isOptimized = true);
 
     void InstrumentRmsUpdater(Function *pFunction);
+
     void InstrumentRmsUpdater(Function *Callee, Instruction *pInst);
 
     void ProcessMemIntrinsic(MemIntrinsic *memInst);

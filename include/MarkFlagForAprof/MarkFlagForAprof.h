@@ -20,15 +20,15 @@ struct MarkFlagForAprof : public ModulePass {
 
     virtual bool runOnModule(Module &M);
 
-    void MarkIgnoreFuncFlag(Function *);
+    void MarkIgnoreOptimizedFlag(Function *);
     void MarkFlag(Instruction *, int);
     void MarkFlag(BasicBlock *, int);
 
     void MarkBBUpdateFlag(Function *);
     void MarkInstFlag(Instruction *);
 
-    void OptimizeReadWrite();
-    void NotOptimizeReadWrite();
+    void OptimizeReadWrite(Function *F);
+    void NotOptimizeReadWrite(Function *F);
 
     void setupInit(Module *M);
     void setupTypes();

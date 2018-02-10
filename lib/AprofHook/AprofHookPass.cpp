@@ -24,8 +24,13 @@ static RegisterPass<AprofHook> X(
         false, false);
 
 
-static cl::opt<int> onlyBBCount("only-bb-count",
-                                cl::desc("only insert bb count."),
+static cl::opt<int> notOptimizing("not-optimize",
+                                  cl::desc("Do not use optimizing read and write."),
+                                  cl::init(0));
+
+
+static cl::opt<int> BBOptimized("bb-optimize",
+                                cl::desc("only bb optimized."),
                                 cl::init(0));
 
 
@@ -52,6 +57,24 @@ bool HasInsertFlag(Instruction *Inst, int flag) {
     return false;
 }
 
+bool hasCallReturn(BasicBlock *BB) {
+
+    for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+        Instruction *Inst = &*II;
+
+        if (Inst->getOpcode() == Instruction::Call) {
+            CallSite ci(Inst);
+            Function *Callee = dyn_cast<Function>(
+                    ci.getCalledValue()->stripPointerCasts());
+
+            if (Callee->getName() == "aprof_return") {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
 
 /* */
 
@@ -176,19 +199,7 @@ void AprofHook::InstrumentInit(Instruction *firstInst) {
 
 }
 
-void AprofHook::InstrumentCostUpdater(Function *pFunction) {
-
-    BBProfilingGraph bbGraph = BBProfilingGraph(*pFunction);
-
-    bbGraph.init();
-    bbGraph.splitNotExitBlock();
-    //bbGraph.printNodeEdgeInfo();
-
-    //bbGraph.printNodeEdgeInfo();
-    bbGraph.calculateSpanningTree();
-
-    BBProfilingEdge *pQueryEdge = bbGraph.addQueryChord();
-    bbGraph.calculateChordIncrements();
+void AprofHook::InstrumentCostUpdater(Function *pFunction, bool isOptimized) {
 
     Instruction *pInstBefore = pFunction->getEntryBlock().getFirstNonPHI();;
 
@@ -198,7 +209,34 @@ void AprofHook::InstrumentCostUpdater(Function *pFunction) {
     StoreInst *pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, false, pInstBefore);
     pStore->setAlignment(8);
 
-    bbGraph.instrumentLocalCounterUpdate(this->BBAllocInst);
+    if (isOptimized) {
+        BBProfilingGraph bbGraph = BBProfilingGraph(*pFunction);
+
+        bbGraph.init();
+        bbGraph.splitNotExitBlock();
+        //bbGraph.printNodeEdgeInfo();
+
+        //bbGraph.printNodeEdgeInfo();
+        bbGraph.calculateSpanningTree();
+
+        BBProfilingEdge *pQueryEdge = bbGraph.addQueryChord();
+        bbGraph.calculateChordIncrements();
+        bbGraph.instrumentLocalCounterUpdate(this->BBAllocInst);
+
+    } else {
+
+        for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
+            BasicBlock *pBlock = &*BI;
+            TerminatorInst *pTerminator = pBlock->getTerminator();
+            LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pTerminator);
+            pLoadnumCost->setAlignment(8);
+            BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
+                                                          this->ConstantLong1, "add",
+                                                          pTerminator);
+            StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, false, pTerminator);
+            pStore->setAlignment(8);
+        }
+    }
 
 }
 
@@ -380,7 +418,6 @@ bool isI8PointerType(Value *val) {
 
 }
 
-
 void AprofHook::ProcessMemIntrinsic(MemIntrinsic *memInst) {
 
     assert(memInst->getNumArgOperands() > 2);
@@ -538,11 +575,12 @@ void AprofHook::InstrumentReturn(Instruction *BeforeInst) {
     void_49->setAttributes(void_PAL);
 }
 
-void AprofHook::InstrumentHooks(Function *Func) {
+void AprofHook::InstrumentHooks(Function *Func, bool isOptimized) {
 
     int FuncID = GetFunctionID(Func);
 
     if (FuncID <= 0) {
+
         errs() << Func->getName() << "\n";
     }
 
@@ -550,17 +588,17 @@ void AprofHook::InstrumentHooks(Function *Func) {
 
     //bool need_update_rms = false;
 
-    if (FuncID > 0) {
+    // be carefull, there must be this order!
+    InstrumentCostUpdater(Func, isOptimized);
+    InstrumentRmsUpdater(Func);
+    InstrumentCallBefore(Func);
 
-        // be carefull, there must be this order!
-        InstrumentCostUpdater(Func);
-        InstrumentRmsUpdater(Func);
-        InstrumentCallBefore(Func);
-    }
+    int _PreInst = 0;
 
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
         BasicBlock *BB = &*BI;
+        Instruction *PreInst;
 
         for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
             Instruction *Inst = &*II;
@@ -632,7 +670,8 @@ void AprofHook::InstrumentHooks(Function *Func) {
                     }
 
                     CallSite ci(Inst);
-                    Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
+                    Function *Callee = dyn_cast<Function>(
+                            ci.getCalledValue()->stripPointerCasts());
 
                     // fgetc automatic rms++;
                     if (Callee) {
@@ -643,10 +682,48 @@ void AprofHook::InstrumentHooks(Function *Func) {
                 }
 
                 case Instruction::Ret: {
-                    InstrumentReturn(Inst);
+                    if (PreInst && _PreInst != GetInstructionID(Inst)) {
+//                        errs() << "0" << Func->getName() << *Inst << "\n";
+                        InstrumentReturn(Inst);
+                        _PreInst = GetInstructionID(Inst);
+                    }
+                    break;
+                }
+
+                case Instruction::Br: {
+
+                    if (!isOptimized) {
+                        // if br label %UnifiedUnreachableBlock
+                        BranchInst *BrInst = dyn_cast<BranchInst>(Inst);
+
+                        if (BrInst->getNumOperands() == 1 &&
+                            BrInst->getOperand(0)->getName() == "UnifiedUnreachableBlock") {
+
+                            if (PreInst && _PreInst != GetInstructionID(PreInst)) {
+//                                errs() << "1" << Func->getName() << *PreInst << "\n";
+                                InstrumentReturn(PreInst);
+                                _PreInst = GetInstructionID(PreInst);
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                case Instruction::Unreachable: {
+                    if (!isOptimized) {
+                        // if br label %UnifiedUnreachableBlock
+                        if (PreInst && _PreInst != GetInstructionID(PreInst)) {
+//                            errs() << "2" << Func->getName() << *PreInst << "\n";
+//                            Inst->getParent()->dump();
+                            InstrumentReturn(PreInst);
+                            _PreInst = GetInstructionID(PreInst);
+                        }
+                    }
                     break;
                 }
             }
+
+            PreInst = Inst;
         }
     }
 
@@ -667,20 +744,35 @@ void AprofHook::SetupHooks() {
     SetupInit();
 
     for (Module::iterator FI = this->pModule->begin(); FI != this->pModule->end(); FI++) {
+
         Function *Func = &*FI;
 
         if (isSampling == 1) {
+
             if (!IsClonedFunc(Func)) {
                 continue;
             }
+
         } else if (IsIgnoreFunc(Func)) {
             continue;
-        }
 
-        if (this->funNameIDFile)
+        } else if (this->funNameIDFile)
             this->funNameIDFile << Func->getName().str()
                                 << ":" << GetFunctionID(Func) << "\n";
-        InstrumentHooks(Func);
+
+        if (notOptimizing == 1) {
+
+            InstrumentHooks(Func, false);
+
+        } else if (BBOptimized == 1 && !getIgnoreOptimizedFlag(Func)) {
+
+            InstrumentHooks(Func, true);
+
+        } else {
+
+            InstrumentHooks(Func, !getIgnoreOptimizedFlag(Func));
+        }
+
 
     }
 
@@ -692,29 +784,6 @@ void AprofHook::SetupHooks() {
         //Instruction *firstInst = &*(MainFunc->begin()->begin());
         Instruction *firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
         InstrumentInit(firstInst);
-
-        // this is make sure main function has call before,
-        // so the shadow stack will not empty in running.
-        BasicBlock *EntryBB = &(MainFunc->getEntryBlock());
-        bool hasCallBefore = false;
-
-        for (BasicBlock::iterator II = EntryBB->begin(); II != EntryBB->end(); II++) {
-            Instruction *Inst = &*II;
-
-            if (Inst->getOpcode() == Instruction::Call) {
-                CallSite ci(Inst);
-                Function *Callee = dyn_cast<Function>(ci.getCalledValue()->stripPointerCasts());
-
-                if (Callee->getName() == "aprof_call_before") {
-                    hasCallBefore = true;
-                    break;
-                }
-            }
-        }
-
-        if (!hasCallBefore) {
-            InstrumentCallBefore(MainFunc);
-        }
     }
 }
 

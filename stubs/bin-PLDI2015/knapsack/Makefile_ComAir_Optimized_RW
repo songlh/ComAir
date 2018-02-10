@@ -1,0 +1,41 @@
+CXX=clang++
+CFLAGS=-O2 -Xclang -disable-O0-optnone -g -flto
+LDFLAGS=-use-gold-plugin -Wl,-plugin-opt=save-temps
+TARGET=target
+
+HOME_PATH=/home/tzt77/Develop/ComAir
+ID_PASS=cmake-build-debug/lib/IDAssigner/libIDAssignerPass.so
+MARK_PASS=cmake-build-debug/lib/MarkFlagForAprof/libMarkFlagForAprofPass.so
+APROF_PASS=cmake-build-debug/lib/AprofHook/libAProfHookPass.so
+INLINE_PASS=cmake-build-debug/lib/MakeFunctionInline/libMakeFunctionInlinePass.so
+
+APROF_LIB=cmake-build-debug/runtime/AProfHooks/libAProfHooks.a
+
+all: target target.aprof
+
+target: target.bc getoptions.o
+	${CXX} ${CFLAGS} ${LDFLAGS} target.bc getoptions.o -o target
+
+target.aprof: target.aprof.bc getoptions.o
+	${CXX} ${CFLAGS} ${LDFLAGS} target.aprof.bc getoptions.o ${HOME_PATH}/${APROF_LIB} -lm -lrt -o target.aprof
+
+target.aprof.bc: target.mark.id.bc
+	opt -load ${HOME_PATH}/${APROF_PASS} -instrument-hooks -bb-optimize 0 -strFileName func_name_id.txt target.mark.id.bc > target.aprof.bc
+
+target.mark.id.bc: target.bc.id
+	opt -load ${HOME_PATH}/${MARK_PASS} -mark-flags target.bc.id > target.mark.id.bc
+
+target.bc.id: target.merge.bc
+	opt -load ${HOME_PATH}/${ID_PASS} -tag-id target.merge.bc > target.bc.id
+
+target.merge.bc: target.bc
+	opt -mergereturn  target.bc > target.merge.bc
+
+target.bc: knapsack-base.cpp
+	${CXX} ${CFLAGS} -c knapsack-base.cpp -o target.bc
+
+getoptions.o: getoptions.cpp
+	${CXX} ${CXXFLAGS} -c getoptions.cpp -o getoptions.o
+
+clean:
+	rm -rf *.o ${TARGET} ${TARGET}.opt *.bc *.resolution.txt *.id target.aprof *.ll *.opt *.bb *.txt

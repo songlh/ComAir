@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
-#include <getoptions.h>
+#include "getoptions.h"
 
 /* Used by example programs to evaluate command line options */
 

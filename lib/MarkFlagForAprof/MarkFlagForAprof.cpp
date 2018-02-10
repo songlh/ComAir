@@ -109,21 +109,6 @@ bool isSuccAllSinglePredecessor(BasicBlock *BB) {
 
 }
 
-unsigned long getExitBlockSize(Function *pFunc) {
-
-    std::vector<BasicBlock *> exitBlocks;
-
-    for (Function::iterator itBB = pFunc->begin(); itBB != pFunc->end(); itBB++) {
-        BasicBlock *BB = &*itBB;
-
-        if (isa<ReturnInst>(BB->getTerminator())) {
-            exitBlocks.push_back(BB);
-        }
-    }
-
-    return exitBlocks.size();
-}
-
 /* end local functions */
 
 char MarkFlagForAprof::ID = 0;
@@ -157,9 +142,9 @@ void MarkFlagForAprof::MarkFlag(Instruction *Inst, int Flag) {
     );
 }
 
-void MarkFlagForAprof::MarkIgnoreFuncFlag(Function *F) {
+void MarkFlagForAprof::MarkIgnoreOptimizedFlag(Function *F) {
 
-    if (getExitBlockSize(F) != 1) {
+    if (getExitBlockSize(F) != 1 || hasUnifiedUnreachableBlock(F)) {
 
         MDBuilder MDHelper(this->pModule->getContext());
 
@@ -174,7 +159,7 @@ void MarkFlagForAprof::MarkIgnoreFuncFlag(Function *F) {
                     Constant *InsID = ConstantInt::get(this->IntType, 1);
                     SmallVector<Metadata *, 1> Vals;
                     Vals.push_back(MDHelper.createConstant(InsID));
-                    Inst->setMetadata(IGNORE_FUNC_FLAG, MDNode::get(
+                    Inst->setMetadata(IGNORE_OPTIMIZED_FLAG, MDNode::get(
                             this->pModule->getContext(), Vals));
                 } else {
 
@@ -316,43 +301,42 @@ void MarkFlagForAprof::MarkBBUpdateFlag(Function *F) {
 
 }
 
-void MarkFlagForAprof::OptimizeReadWrite() {
+void MarkFlagForAprof::OptimizeReadWrite(Function *Func) {
 
     std::map<int, std::set<Value *>> VisitedValues;
 
-    for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
+    if (isSampling == 1) {
 
-        Function *Func = &*FI;
-
-        if (isSampling == 1) {
-            if (!IsClonedFunc(Func)) {
-                continue;
-            }
-        } else if (IsIgnoreFunc(Func)) {
-            continue;
+        if (!IsClonedFunc(Func)) {
+            return;
         }
 
-        VisitedValues.clear();
+    } else if (IsIgnoreFunc(Func)) {
 
-        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+        return;
+    }
 
-            BasicBlock *BB = &*BI;
+    VisitedValues.clear();
 
-            int bb_id = GetBasicBlockID(BB);
+    for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
-            BasicBlock *Pre_BB = BB->getSinglePredecessor();
+        BasicBlock *BB = &*BI;
 
-            if (Pre_BB) {
-                // if current bb has only one pre bb, we can update this's pre's values.
-                int pre_bb_id = GetBasicBlockID(Pre_BB);
-                VisitedValues = UpdatePreVisitedToCur(VisitedValues, pre_bb_id, bb_id);
-            }
+        int bb_id = GetBasicBlockID(BB);
 
-            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+        BasicBlock *Pre_BB = BB->getSinglePredecessor();
 
-                Instruction *Inst = &*II;
+        if (Pre_BB) {
+            // if current bb has only one pre bb, we can update this's pre's values.
+            int pre_bb_id = GetBasicBlockID(Pre_BB);
+            VisitedValues = UpdatePreVisitedToCur(VisitedValues, pre_bb_id, bb_id);
+        }
 
-                switch (Inst->getOpcode()) {
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            switch (Inst->getOpcode()) {
 
 //                    case Instruction::Alloca: {
 //                        if (!IsInBasicBlock(bb_id, VisitedValues, Inst)) {
@@ -363,78 +347,81 @@ void MarkFlagForAprof::OptimizeReadWrite() {
 //                        break;
 //                    }
 
-                    case Instruction::Call: {
-                        // clear current VisitedValues.second
-                        CallSite ci(Inst);
-                        Function *Callee = dyn_cast<Function>(
-                                ci.getCalledValue()->stripPointerCasts());
+                case Instruction::Call: {
+                    // clear current VisitedValues.second
+                    CallSite ci(Inst);
+                    Function *Callee = dyn_cast<Function>(
+                            ci.getCalledValue()->stripPointerCasts());
 
-                        if (!IsIgnoreFunc(Callee)) {
-                            if (VisitedValues.find(bb_id) != VisitedValues.end()) {
-                                std::set<Value *> null_set;
-                                null_set.clear();
-                                VisitedValues[bb_id] = null_set;
-                            }
+                    if (!IsIgnoreFunc(Callee)) {
+                        if (VisitedValues.find(bb_id) != VisitedValues.end()) {
+                            std::set<Value *> null_set;
+                            null_set.clear();
+                            VisitedValues[bb_id] = null_set;
                         }
-                        break;
                     }
+                    break;
+                }
 
-                    case Instruction::Load: {
-                        Value *firstOp = Inst->getOperand(0);
-                        if (!IsInBasicBlock(bb_id, VisitedValues, firstOp)) {
-                            MarkFlag(Inst, READ);
-                        }
-                        VisitedValues = UpdateVisitedMap(
-                                VisitedValues, bb_id, firstOp);
-                        break;
+                case Instruction::Load: {
+                    Value *firstOp = Inst->getOperand(0);
+                    if (!IsInBasicBlock(bb_id, VisitedValues, firstOp)) {
+                        MarkFlag(Inst, READ);
                     }
+                    VisitedValues = UpdateVisitedMap(
+                            VisitedValues, bb_id, firstOp);
+                    break;
+                }
 
-                    case Instruction::Store: {
+                case Instruction::Store: {
 //                        Value *firstOp = Inst->getOperand(0);
 //                        firstOp->dump();
 
-                        Value *secondOp = Inst->getOperand(1);
-                        if (!IsInBasicBlock(bb_id, VisitedValues, secondOp)) {
-                            MarkFlag(Inst, WRITE);
-                        }
-                        VisitedValues = UpdateVisitedMap(
-                                VisitedValues, bb_id, secondOp);
-                        break;
+                    Value *secondOp = Inst->getOperand(1);
+                    if (!IsInBasicBlock(bb_id, VisitedValues, secondOp)) {
+                        MarkFlag(Inst, WRITE);
                     }
-
+                    VisitedValues = UpdateVisitedMap(
+                            VisitedValues, bb_id, secondOp);
+                    break;
                 }
+
             }
         }
     }
 }
 
-void MarkFlagForAprof::NotOptimizeReadWrite() {
+void MarkFlagForAprof::NotOptimizeReadWrite(Function *Func) {
 
-    for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
-        Function *Func = &*FI;
+    if (isSampling == 1) {
 
-        if (IsIgnoreFunc(Func)) {
-            continue;
+        if (!IsClonedFunc(Func)) {
+            return;
         }
 
-        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
-            for (BasicBlock::iterator II = BI->begin(); II != BI->end(); II++) {
-                Instruction *Inst = &*II;
+    } else if (IsIgnoreFunc(Func)) {
 
-                switch (Inst->getOpcode()) {
-        			case Instruction::Alloca: {
-                        MarkFlag(Inst, READ);
-        				break;
-        			}
-                    case Instruction::Load: {
-                        MarkFlag(Inst, READ);
-                        break;
-                    }
-                    case Instruction::Store: {
-                        MarkFlag(Inst, WRITE);
-                        break;
-                    }
+        return;
+    }
 
+    for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+        
+        for (BasicBlock::iterator II = BI->begin(); II != BI->end(); II++) {
+            
+            Instruction *Inst = &*II;
+
+            switch (Inst->getOpcode()) {
+//                case Instruction::Alloca: {
+//                    MarkFlag(Inst, READ);
+//                    break;
+//                }
+                case Instruction::Load: {
+                    MarkFlag(Inst, READ);
+                    break;
+                }
+                case Instruction::Store: {
+                    MarkFlag(Inst, WRITE);
+                    break;
                 }
             }
         }
@@ -447,16 +434,14 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
 
     for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
         Function *Func = &*FI;
-        MarkIgnoreFuncFlag(Func);
-    }
+        MarkIgnoreOptimizedFlag(Func);
 
-    if (notOptimizing == 1) {
+        if (notOptimizing == 1 || getIgnoreOptimizedFlag(Func)) {
+            NotOptimizeReadWrite(Func);
 
-        NotOptimizeReadWrite();
-
-    } else {
-
-        OptimizeReadWrite();
+        } else {
+            OptimizeReadWrite(Func);
+        }
     }
 
     return false;

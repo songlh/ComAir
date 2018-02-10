@@ -15,11 +15,16 @@ int GetInstructionID(Instruction *II);
 
 int GetInstructionInsertFlag(Instruction *II);
 
+bool getIgnoreOptimizedFlag(Function *F);
+
 bool IsIgnoreFunc(Function *F);
 
 bool IsClonedFunc(Function *F);
 
 int GetBBCostNum(BasicBlock *BB);
 
+unsigned long getExitBlockSize(Function *F);
+
+bool hasUnifiedUnreachableBlock(Function *F);
 
 #endif //COMAIR_HELPER_H

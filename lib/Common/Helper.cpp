@@ -105,23 +105,28 @@ int GetInstructionInsertFlag(Instruction *II) {
     return -1;
 }
 
-bool getIgnoreFlag(Function *F) {
+bool getIgnoreOptimizedFlag(Function *F) {
 
     if (F->begin() == F->end()) {
-        return true;
+        return false;
     }
 
     BasicBlock *entryBB = &*(F->begin());
+
     if (entryBB) {
 
-        Instruction *II = &*(entryBB->getFirstInsertionPt());
-        MDNode *Node = II->getMetadata(IGNORE_FUNC_FLAG);
+        for (BasicBlock::iterator II = entryBB->begin(); II != entryBB->end(); II++) {
 
-        if (!Node) {
-            return false;
+            Instruction *Inst = &*II;
+
+            MDNode *Node = Inst->getMetadata(IGNORE_OPTIMIZED_FLAG);
+
+            if (Node) {
+
+                return true;
+            }
         }
 
-        return true;
     }
 
     return false;
@@ -131,10 +136,6 @@ bool getIgnoreFlag(Function *F) {
 bool IsIgnoreFunc(Function *F) {
 
     if (!F) {
-        return true;
-    }
-
-    if (getIgnoreFlag(F)) {
         return true;
     }
 
@@ -209,4 +210,57 @@ int GetBBCostNum(BasicBlock *BB) {
 
     return -1;
 
+}
+
+unsigned long getExitBlockSize(Function *pFunc) {
+
+    std::vector<BasicBlock *> exitBlocks;
+
+    for (Function::iterator itBB = pFunc->begin(); itBB != pFunc->end(); itBB++) {
+        BasicBlock *BB = &*itBB;
+
+        if (isa<ReturnInst>(BB->getTerminator())) {
+            exitBlocks.push_back(BB);
+        }
+    }
+
+    return exitBlocks.size();
+}
+
+/*
+ * UnifiedUnreachableBlock, must run behind merge return pass.
+ */
+bool hasUnifiedUnreachableBlock(Function *F) {
+
+    for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            if (Inst->getOpcode() == Instruction::Br) {
+
+                BranchInst *BrInst = dyn_cast<BranchInst>(Inst);
+
+                if (BrInst->isConditional() || BrInst->getNumOperands() > 1) {
+                    continue;
+
+                } else {
+
+                    if (BrInst->getNumOperands() == 1) {
+                        if (BrInst->getOperand(0)->getName() == "UnifiedUnreachableBlock") {
+                            return true;
+                        }
+                    }
+                }
+            }
+            else if (Inst->getOpcode() == Instruction::Unreachable) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }

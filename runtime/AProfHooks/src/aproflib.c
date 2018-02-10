@@ -181,11 +181,10 @@ void aprof_init() {
 
 void aprof_write(void *memory_addr, unsigned long length) {
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long i = start_addr;
-    unsigned long end_addr = start_addr + 1;
+    unsigned long end_addr = start_addr + length;
 
-    for (; i < end_addr; i++) {
-        aprof_insert_page_table(i, count);
+    for (; start_addr < end_addr; start_addr++) {
+        aprof_insert_page_table(start_addr, count);
 
     }
 
@@ -195,21 +194,20 @@ void aprof_write(void *memory_addr, unsigned long length) {
 void aprof_read(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long i = start_addr;
-    unsigned long end_addr = start_addr + 1;
-    int j;
+    unsigned long end_addr = start_addr + length;
+    int j = stack_top;
 
-    for (unsigned long i = start_addr; i < (start_addr + length); i++) {
+    for (; start_addr < end_addr; start_addr++) {
 
         // We assume that w has been wrote before reading.
         // ts[w] > 0 and ts[w] < S[top]
-        unsigned long ts_w = aprof_query_page_table(i);
-        if (stack_top > -1 && ts_w < shadow_stack[stack_top].ts) {
+        unsigned long ts_w = aprof_query_page_table(start_addr);
+        if (ts_w < shadow_stack[stack_top].ts) {
 
             shadow_stack[stack_top].rms++;
 
             if (ts_w != 0) {
-                for (j = stack_top; j > 0; j--) {
+                for (; j > 0; j--) {
 
                     if (shadow_stack[j].ts <= ts_w) {
                         shadow_stack[j].rms--;
@@ -219,7 +217,7 @@ void aprof_read(void *memory_addr, unsigned long length) {
             }
         }
 
-        aprof_insert_page_table(i, count);
+        aprof_insert_page_table(start_addr, count);
     }
 
 }

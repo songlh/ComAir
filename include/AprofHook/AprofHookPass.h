@@ -74,6 +74,8 @@ struct AprofHook : public ModulePass {
     Function *aprof_increment_cost;
     // void aprof_increment_rms
     Function *aprof_increment_rms;
+    // void aprof_increment_rms
+    Function *aprof_increment_rms_for_args;
     // void aprof_write(void *memory_addr, unsigned int length)
     Function *aprof_write;
     // void aprof_read(void *memory_addr, unsigned int length)

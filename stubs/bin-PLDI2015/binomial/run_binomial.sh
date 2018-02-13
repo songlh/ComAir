@@ -32,7 +32,7 @@ do_sampling () {
  /HDD/llvm5.0/install/bin/llc -filetype=obj ${BC_PROF_FILE} -o ${O_PROF_FILE}
 
  # link c++
- /HDD/llvm5.0/install/bin/clang++ -O2 ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lm -lrt
+ /HDD/llvm5.0/install/bin/clang++ -O0 ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lm -lrt
 
  # test one time
  ./a.out 3
@@ -57,7 +57,7 @@ do_not_sampling () {
  /HDD/llvm5.0/install/bin/llc -filetype=obj ${BC_PROF_FILE} -o ${O_PROF_FILE}
 
  # link c++
- /HDD/llvm5.0/install/bin/clang++ -O2 ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lm -lrt
+ /HDD/llvm5.0/install/bin/clang++ -O0 ${O_PROF_FILE} ${RUNTIME_LIB} -lstdc++ -lm -lrt
 
  # test one time
  ./a.out 50 5

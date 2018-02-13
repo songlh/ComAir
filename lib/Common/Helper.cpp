@@ -145,9 +145,9 @@ bool IsIgnoreFunc(Function *F) {
 
     std::string FuncName = F->getName().str();
 
-    if (FuncName == "JS_Assert") {
-        return true;
-    }
+//    if (FuncName == "JS_Assert") {
+//        return true;
+//    }
 
     if (FuncName.substr(0, 5) == "aprof") {
         return true;

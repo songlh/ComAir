@@ -1,0 +1,40 @@
+The reason for performance degradation: 
+There are two explanation of the performance degradation. 
+The first explanation: 
+
+Developers mention that the following loop has a lot of work to do: 
+
+private void fireMessageLoggedEvent(BuildEvent event, String message, int priority) {
+
+     .. 
+     while (iter.hasNext()) {
+                    BuildListener listener = (BuildListener) iter.next();
+                    listener.messageLogged(event);
+                }
+
+}
+
+But according to the source code I am using, 
+listener is in IntrospectionHelper type, and their messageLogged is empty. 
+I add time stamps before and after the loop, and execution time for the loop is negligible. 
+
+The second explanation: 
+According to my own profiling, the execution time difference happens in the buggy code: 
+
+public synchronized void addBuildListener(BuildListener listener) {
+        // create a new Vector to avoid ConcurrentModificationExc when
+        // the listeners get added/removed while we are in fire
+        Vector newListeners = getBuildListeners();
+   +     if (!newListeners.contains(listener)) {
+                 newListeners.addElement(listener);
+          }
+        listeners = newListeners;
+    }
+
+In java, Vector is implemented in an array. When the array is full, 
+a new array with two times of the old size will be allocated, 
+and content from the old array will be copied to the new array. 
+It could be possible that performance degradation is caused by these memory copy. 
+
+My C implementation is based on the first explanation. 
+

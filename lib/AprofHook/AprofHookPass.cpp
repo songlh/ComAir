@@ -130,7 +130,6 @@ void AprofHook::SetupFunctions() {
         ArgTypes.clear();
     }
 
-
     // aprof_write
     this->aprof_write = this->pModule->getFunction("aprof_write");
 //    assert(this->aprof_write != NULL);
@@ -365,15 +364,22 @@ void AprofHook::InstrumentRmsUpdater(Function *F) {
             add_rms += dl->getTypeAllocSize(argType);
         }
 
-        Instruction *firstInst = &*(F->getEntryBlock().getFirstNonPHI());
+        Instruction *II = &*(F->getEntryBlock().getFirstInsertionPt());
+
+
+        CastInst *ptr_50 = new BitCastInst(this->BBAllocInst, this->VoidPointerType,
+                                           "");
+        ptr_50->insertAfter(II);
+
         std::vector<Value *> vecParams;
         ConstantInt *const_rms = ConstantInt::get(
                 this->pModule->getContext(),
                 APInt(64, StringRef(std::to_string(add_rms)), 10));
-
+        vecParams.push_back(ptr_50);
         vecParams.push_back(const_rms);
-        CallInst *void_49 = CallInst::Create(this->aprof_increment_rms,
-                                             vecParams, "", firstInst);
+        CallInst *void_49 = CallInst::Create(this->aprof_read,
+                                             vecParams, "");
+        void_49->insertAfter(ptr_50);
         void_49->setCallingConv(CallingConv::C);
         void_49->setTailCall(false);
         AttributeList void_PAL;
@@ -796,7 +802,7 @@ bool AprofHook::runOnModule(Module &M) {
 
     } else {
 
-        this->funNameIDFile.open(strFileName, std::ofstream::out | std::ofstream::app);
+        this->funNameIDFile.open(strFileName, std::ofstream::out);
     }
 
     this->pModule = &M;

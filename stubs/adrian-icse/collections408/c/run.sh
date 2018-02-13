@@ -1,3 +1,4 @@
+#!/usr/bin/env bash
 
 time ./collections408 50000
 

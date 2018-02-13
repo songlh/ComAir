@@ -405,9 +405,9 @@ void MarkFlagForAprof::NotOptimizeReadWrite(Function *Func) {
     }
 
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
-        
+
         for (BasicBlock::iterator II = BI->begin(); II != BI->end(); II++) {
-            
+
             Instruction *Inst = &*II;
 
             switch (Inst->getOpcode()) {

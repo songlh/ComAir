@@ -1,0 +1,47 @@
+CXX=clang
+CFLAGS=-O2 -Xclang -disable-O0-optnone -g -flto
+LDFLAGS=-use-gold-plugin -Wl,-plugin-opt=save-temps
+TARGET=target
+
+HOME_PATH=/home/tzt77/Develop/ComAir
+ID_PASS=cmake-build-debug/lib/IDAssigner/libIDAssignerPass.so
+MARK_PASS=cmake-build-debug/lib/MarkFlagForAprof/libMarkFlagForAprofPass.so
+APROF_PASS=cmake-build-debug/lib/AprofHook/libAProfHookPass.so
+INLINE_PASS=cmake-build-debug/lib/MakeFunctionInline/libMakeFunctionInlinePass.so
+
+RUNTIME_LIB=stubs/runtime/aproflib.bc
+
+all: target aproflib.inline.bc target.aprof.inline
+
+target: target.bc
+	${CXX} ${CFLAGS} ${LDFLAGS} target.bc -o target
+
+target.aprof.inline: target.inline.bc
+	${CXX} ${CFLAGS} ${LDFLAGS} target.inline.bc -lm -lrt -o target.aprof.inline
+
+target.inline.bc: target.pre.inline.bc
+	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 0 target.pre.inline.bc > target.inline.bc
+
+target.pre.inline.bc: target.aprof.bc
+	llvm-link aproflib.inline.bc target.aprof.bc -o target.pre.inline.bc
+
+aproflib.inline.bc: ${HOME_PATH}/${RUNTIME_LIB}
+	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 1 ${HOME_PATH}/${RUNTIME_LIB} > aproflib.inline.bc
+
+target.aprof.bc: target.mark.id.bc
+	opt -load ${HOME_PATH}/${APROF_PASS} -instrument-hooks -strFileName func_name_id.txt target.mark.id.bc > target.aprof.bc
+
+target.mark.id.bc: target.bc.id
+	opt -load ${HOME_PATH}/${MARK_PASS} -mark-flags target.bc.id > target.mark.id.bc
+
+target.bc.id: target.merge.bc
+	opt -load ${HOME_PATH}/${ID_PASS} -tag-id target.merge.bc > target.bc.id
+
+target.merge.bc: target.bc
+	opt -mergereturn  target.bc > target.merge.bc
+
+target.bc: mozilla477564.c
+	${CXX} ${CFLAGS} mozilla477564.c -c -o target.bc
+
+clean:
+	rm -rf *.o ${TARGET} ${TARGET}.opt *.bc *.resolution.txt *.id target.aprof *.ll *.aprof *.inline *.txt

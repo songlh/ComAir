@@ -59,7 +59,7 @@ do_not_sampling () {
 ## # link runtime lib
  /HDD/llvm5.0/install/bin/clang -O2  ${O_PROF_FILE} ${RUNTIME_LIB} -lm -lrt
 
- ./a.out 1000
+ ./a.out 10
 
  # run some times and calculate result
  # python run_apache34464.py

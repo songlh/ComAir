@@ -93,7 +93,7 @@ void log_log(int level, const char *file, int line, const char *fmt, ...) {
 
 void aprof_logger_init() {
     const char *FILENAME = "aprof_logger.txt";
-    int LEVEL = 1;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, LEVEL, QUIET);

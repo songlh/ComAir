@@ -27,10 +27,10 @@ set(BINARY_SOURCES
         )
 
 # Add an executable with the above sources
-add_executable(AprofLogMem ${BINARY_SOURCES})
+add_executable(AprofLogger ${BINARY_SOURCES})
 
 # link the new hello_library target with the hello_binary target
-target_link_libraries(AprofLogMem AProfHooks m rt)
+target_link_libraries(AprofLogger AProfHooks m rt)
 
 
 ## TODO: this is for testing runtime lib.

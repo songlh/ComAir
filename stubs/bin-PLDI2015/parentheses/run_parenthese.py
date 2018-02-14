@@ -75,7 +75,7 @@ def parse_log_file():
                     results.append(item)
 
     df = pd.DataFrame(data=results, columns=['func_id', 'rms', 'cost', 'run_id'])
-    df.to_csv('knapsack_result.csv', index=False)
+    df.to_csv('parenthese_result.csv', index=False)
 
 
 def calculate_curve_fit():
@@ -87,7 +87,7 @@ def calculate_curve_fit():
     def fund(x, a, b):
         return a**x + b
 
-    df = pd.read_csv('knapsack_result.csv')
+    df = pd.read_csv('parenthese_result.csv')
     df = df.loc[df['func_id'] == 2]
     xdata = df[['rms']].apply(pd.to_numeric)
     ydata = df[['cost']].apply(pd.to_numeric)

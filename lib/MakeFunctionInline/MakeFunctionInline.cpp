@@ -13,6 +13,9 @@
 #include "MakeFunctionInline/MakeFunctionInline.h"
 
 
+using namespace std;
+
+
 static RegisterPass<MakeFunctionInline> X(
         "func-inline", "inline instrumented function",
         true, true);
@@ -20,11 +23,25 @@ static RegisterPass<MakeFunctionInline> X(
 static cl::opt<int> libInline("lib-inline",
                               cl::desc("runtime lib inline."),
                               cl::init(1));
+int MAX_BB_SIZE = 100;
 
+/* local function */
+
+int getBasicBlockSize(Function *F) {
+
+    int size = 0;
+
+    for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+        size++;
+    }
+
+    return size;
+}
+
+/* end */
 
 char MakeFunctionInline::ID = 0;
 
-using namespace std;
 
 void MakeFunctionInline::getAnalysisUsage(AnalysisUsage &AU) const {
 
@@ -42,7 +59,7 @@ bool MakeFunctionInline::runOnModule(Module &M) {
 
     std::set<std::string> BCInlineFuncStr = {
             "aprof_read", "aprof_write", "aprof_increment_rms",
-            "aprof_init", "aprof_call_before",  "aprof_return", "aprof_geo"
+            "aprof_init", "aprof_call_before", "aprof_return", "aprof_geo"
     };
 
 
@@ -50,6 +67,10 @@ bool MakeFunctionInline::runOnModule(Module &M) {
 
     for (Module::iterator FI = M.begin(); FI != M.end(); FI++) {
         Function *F = &*FI;
+
+        if (getBasicBlockSize(F) > MAX_BB_SIZE) {
+            continue;
+        }
 
         for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
 
@@ -88,11 +109,11 @@ bool MakeFunctionInline::runOnModule(Module &M) {
         InlineFunctionInfo IFI;
         bool Changed = InlineFunction(pCall, IFI);
 
-//        if (!Changed) {
-//
-//            pCall->dump();
-//            errs() << "error inline!" << "\n";
-//
-//        }
+        if (!Changed) {
+
+            pCall->dump();
+            errs() << "error inline!" << "\n";
+
+        }
     }
 }

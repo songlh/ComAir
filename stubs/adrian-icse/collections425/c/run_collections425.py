@@ -18,7 +18,7 @@ def generate_test_case(i):
 
 
 def run_command():
-    for i in range(0, 100):
+    for i in range(0, 30):
         if os.path.exists(APROF_LOGGER):
             new_name = APROF_LOGGER.split('.')[0] + '_' + str(i) + '.txt'
             os.rename(APROF_LOGGER, new_name)

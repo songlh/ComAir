@@ -15,7 +15,7 @@
 
 #include "Common/Constant.h"
 #include "Common/Helper.h"
-#include "PrepareSampling/PrePareSampling.h"
+#include "Sampling/PrepareSampling/PrePareSampling.h"
 
 
 using namespace llvm;
@@ -28,8 +28,8 @@ static RegisterPass<PrepareSampling> X(
 
 
 static cl::opt<int> SamplingRate("samling-rate",
-                               cl::desc("The rate of sampling."),
-                               cl::init(100));
+                                 cl::desc("The rate of sampling."),
+                                 cl::init(100));
 
 
 /* ---- local function ---- */
@@ -87,6 +87,20 @@ bool IsNeedChangeCallee(Function *F) {
 
     return true;
 
+}
+
+bool IsRecursiveCall(std::string callerName, std::string calleeName) {
+
+    long nameLength = calleeName.length();
+
+    if (callerName.length() > 7 &&
+        callerName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+        if (callerName.substr(7, nameLength) == calleeName) {
+            return true;
+        }
+    }
+
+    return false;
 }
 
 
@@ -150,7 +164,7 @@ void PrepareSampling::SetupTypes(Module *pModule) {
 void PrepareSampling::SetupConstants(Module *pModule) {
     this->ConstantInt0 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("0"), 10));
     this->ConstantSamplingRate = ConstantInt::get(pModule->getContext(),
-                                            APInt(32, StringRef(std::to_string(SamplingRate)), 10));
+                                                  APInt(32, StringRef(std::to_string(SamplingRate)), 10));
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
     this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
     this->ConstantIntN1 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("-1"), 10));
@@ -579,6 +593,12 @@ void PrepareSampling::CloneFunctionCalled() {
                             CallInst *pCall = dyn_cast<CallInst>(Inst);
 
                             std::string funcName = Callee->getName().str();
+
+                            // If self call self, we will not change call target.
+                            if (IsRecursiveCall(Func->getName(), funcName)) {
+                                break;
+                            }
+
                             Function *targetFunc = SearchFunctionByName(
                                     tempVector, funcName);
 

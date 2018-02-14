@@ -18,7 +18,7 @@ def generate_test_case(i):
 
 
 def run_command():
-    for i in range(0, 50):
+    for i in range(0, 20):
         if os.path.exists(APROF_LOGGER):
             new_name = APROF_LOGGER.split('.')[0] + '_' + str(i) + '.txt'
             os.rename(APROF_LOGGER, new_name)
@@ -108,8 +108,8 @@ def calculate_curve_fit():
 
 if __name__ == '__main__':
     clean_temp_files()
-    # run_command()
-    # parse_log_file()
+    run_command()
+    parse_log_file()
     # calculate_curve_fit()
     # if you want to save result csv,
     # you can comment the follow line code.

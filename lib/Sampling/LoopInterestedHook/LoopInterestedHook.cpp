@@ -10,7 +10,7 @@
 #include "llvm/IR/IntrinsicInst.h"
 #include "llvm/Support/raw_ostream.h"
 
-#include "LoopInterestedHook/LoopInterestedHook.h"
+#include "Sampling/LoopInterestedHook/LoopInterestedHook.h"
 #include "Common/Constant.h"
 #include "Common/Helper.h"
 #include "Support/BBProfiling.h"

@@ -1,1 +1,2 @@
 add_subdirectory(AProfHooks)
+add_subdirectory(AProfRecursiveHooks)

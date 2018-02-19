@@ -10,7 +10,79 @@ struct stack_elem shadow_stack[1];
 unsigned long sampling_count = 0;
 static int old_value = -1;
 
+// logger
+
+static void lock(void) {
+    if (L.lock) {
+        L.lock(L.udata, 1);
+    }
+}
+
+static void unlock(void) {
+    if (L.lock) {
+        L.lock(L.udata, 0);
+    }
+}
+
+void log_set_udata(void *udata) {
+    L.udata = udata;
+}
+
+void log_set_lock(log_LockFn fn) {
+    L.lock = fn;
+}
+
+void log_set_fp(FILE *fp) {
+    L.fp = fp;
+}
+
+void log_set_level(int level) {
+    L.level = level;
+}
+
+void log_set_quiet(int enable) {
+    L.quiet = enable ? 1 : 0;
+}
+
+void log_init(FILE *fp, int level, int enable) {
+    L.fp = fp;
+    L.level = level;
+    L.quiet = enable ? 1 : 0;
+}
+
+void log_log(int level, const char *file, int line, const char *fmt, ...) {
+    if (level < L.level) {
+        return;
+    }
+
+    /* Acquire lock */
+    lock();
+
+    /* Log to file */
+    if (L.fp) {
+        va_list args;
+        va_start(args, fmt);
+        vfprintf(L.fp, fmt, args);
+        va_end(args);
+        fprintf(L.fp, "\n");
+    }
+
+    /* Release lock */
+    unlock();
+}
+
+void aprof_logger_init() {
+    const char *FILENAME = "aprof_logger.txt";
+    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
+    int QUIET = 1;
+    FILE *fp = fopen(FILENAME, "w");
+    log_init(fp, LEVEL, QUIET);
+
+}
+
+
 void aprof_init() {
+
     // init share memory
     fd = shm_open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
 
@@ -22,6 +94,8 @@ void aprof_init() {
 
      pcBuffer = (void *) mmap(0, BUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
 
+//    aprof_logger_init();
+
 }
 
 void aprof_call_in(int funcID, unsigned long numCost) {
@@ -31,8 +105,11 @@ void aprof_call_in(int funcID, unsigned long numCost) {
     shadow_stack[0].in_out = 'i';
     memcpy(pcBuffer, &(shadow_stack[0]), struct_size);
     pcBuffer += struct_size;
-    lastNumCost = numCost;
-
+//    "ID %d ; Cost %ld ;"
+//    log_fatal("ID %d ; Cost %ld ;",
+//              funcID,
+//              numCost
+//    );
 }
 
 void aprof_return(int funcID, unsigned long numCost) {
@@ -42,7 +119,11 @@ void aprof_return(int funcID, unsigned long numCost) {
     shadow_stack[0].in_out = 'o';
     memcpy(pcBuffer, &(shadow_stack[0]), struct_size);
     pcBuffer += struct_size;
-
+//    "ID %d ; Cost %ld ;"
+//    log_fatal("ID %d ; Cost %ld ;",
+//              funcID,
+//              numCost
+//    );
 }
 
 
@@ -73,7 +154,6 @@ static double aprof_rand_val(int seed) {
 
     // Return a random value between 0.0 and 1.0
     return ((double) x / m);
-
 }
 
 
@@ -93,6 +173,8 @@ int aprof_geo(int iRate) {
     } while ((int) geo_value == old_value + 1);
 
     old_value = (int) geo_value;
+    // log sampling call chain number
+//    sampling_count = count - sampling_count;
+//    log_fatal("sampling count: %ld;", sampling_count);
     return old_value;
-
 }

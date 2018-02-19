@@ -19,7 +19,7 @@ target.aprof: target.aprof.bc
 	${CXX} ${CFLAGS} ${LDFLAGS} target.aprof.bc ${HOME_PATH}/${APROF_LIB} -lm -lrt -o target.aprof
 
 target.aprof.bc: target.bc.id
-	opt -load ${HOME_PATH}/${APROF_PASS} -interested-recursive-hook -strFileName func_name_id.log target.bc.id > target.aprof.bc
+	opt -load ${HOME_PATH}/${APROF_PASS} -interested-recursive-hook -strFuncName _Z3fibi -strFileName func_name_id.log target.bc.id > target.aprof.bc
 
 target.bc.id: target.merge.bc
 	opt -load ${HOME_PATH}/${ID_PASS} -tag-id target.merge.bc > target.bc.id

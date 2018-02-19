@@ -165,7 +165,7 @@ int ArrayList_indexOf(ArrayList * pArray, int e)
 {
 	int i = 0;
 
-	for(i=0; i < pArray->size; i ++)
+	for(i=0; i < pArray->size; i++)
 	{
 		if(pArray->data[i] == e)
 		{

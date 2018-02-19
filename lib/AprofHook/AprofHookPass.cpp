@@ -791,6 +791,16 @@ void AprofHook::SetupHooks() {
         Instruction *firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
         InstrumentInit(firstInst);
     }
+
+//    Function *mysql_parse = this->pModule->getFunction("_Z11mysql_parseP3THDPcj");
+//    assert(mysql_parse != NULL);
+//
+//    if (mysql_parse) {
+//
+//        //Instruction *firstInst = &*(MainFunc->begin()->begin());
+//        Instruction *firstInst = mysql_parse->getEntryBlock().getFirstNonPHI();
+//        InstrumentInit(firstInst);
+//    }
 }
 
 bool AprofHook::runOnModule(Module &M) {

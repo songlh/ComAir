@@ -27,4 +27,8 @@ unsigned long getExitBlockSize(Function *F);
 
 bool hasUnifiedUnreachableBlock(Function *F);
 
+bool IsRecursiveCall(std::string callerName, std::string calleeName);
+
+bool IsRecursiveCall(Function *F);
+
 #endif //COMAIR_HELPER_H

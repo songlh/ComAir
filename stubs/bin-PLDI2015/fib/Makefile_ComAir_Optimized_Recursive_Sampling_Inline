@@ -34,7 +34,7 @@ target.bc.id: target.pre-sampling.bc
 	opt -load ${HOME_PATH}/${ID_PASS} -tag-id target.pre-sampling.bc > target.bc.id
 
 target.pre-sampling.bc: target.merge.bc
-	opt -load ${HOME_PATH}/${SAMPLING_PASS} -prepare-sampling -samling-rate 2000  target.merge.bc > target.pre-sampling.bc
+	opt -load ${HOME_PATH}/${SAMPLING_PASS} -prepare-sampling -only-recursive 1 -sample-rate 1000  target.merge.bc > target.pre-sampling.bc
 
 target.merge.bc: target.mem.bc
 	opt -mergereturn  target.mem.bc > target.merge.bc

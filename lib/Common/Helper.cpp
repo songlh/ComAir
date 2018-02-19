@@ -163,7 +163,6 @@ bool IsIgnoreFunc(Function *F) {
     return false;
 }
 
-
 bool IsClonedFunc(Function *F) {
 
     if (!F) {
@@ -255,9 +254,56 @@ bool hasUnifiedUnreachableBlock(Function *F) {
                         }
                     }
                 }
-            }
-            else if (Inst->getOpcode() == Instruction::Unreachable) {
+            } else if (Inst->getOpcode() == Instruction::Unreachable) {
                 return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+bool IsRecursiveCall(std::string callerName, std::string calleeName) {
+
+    long nameLength = calleeName.length();
+
+    if (callerName == calleeName) {
+        return true;
+    }
+
+    if (callerName.length() > 7 &&
+        callerName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+        if (callerName.substr(7, nameLength) == calleeName) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool IsRecursiveCall(Function *F) {
+
+    std::string FName = F->getName().str();
+    for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+            Instruction *Inst = &*II;
+
+            if (Inst->getOpcode() == Instruction::Call) {
+
+                CallSite ci(Inst);
+                Function *Callee = dyn_cast<Function>(
+                        ci.getCalledValue()->stripPointerCasts());
+
+                if (Callee) {
+                    std::string funcName = Callee->getName().str();
+
+                    // maybe clone function
+                    if (IsRecursiveCall(FName, funcName)) {
+                        return true;
+                    }
+                }
             }
         }
     }

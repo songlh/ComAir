@@ -24,6 +24,8 @@ struct RecursiveInterestedHook : public ModulePass {
 
     virtual bool runOnModule(Module &M);
 
+    bool hasRecursiveCall(Module &M);
+
     void SetupInit();
 
     void SetupTypes();
@@ -41,7 +43,6 @@ struct RecursiveInterestedHook : public ModulePass {
     void InstrumentInit(Instruction *);
 
     void InstrumentHooks(Function *);
-
 
     void InstrumentCallBefore(Function *pFunction);
 
@@ -64,7 +65,7 @@ struct RecursiveInterestedHook : public ModulePass {
     // int aprof_init()
     Function *aprof_init;
     // void aprof_call_before(char *funcName)
-    Function *aprof_call_before;
+    Function *aprof_call_in;
     // void aprof_return()
     Function *aprof_return;
     /* ********** */

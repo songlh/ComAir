@@ -27,7 +27,7 @@ static RegisterPass<PrepareSampling> X(
         "prepare for sampling", true, true);
 
 
-static cl::opt<int> SamplingRate("samling-rate",
+static cl::opt<int> SamplingRate("sample-rate",
                                  cl::desc("The rate of sampling."),
                                  cl::init(100));
 
@@ -74,6 +74,9 @@ void SplitReturnBlock(Function *pFunction) {
 
 bool IsNeedChangeCallee(Function *F) {
 
+    if (!F)
+        return false;
+
     if (F->isDeclaration() || F->isIntrinsic())
         return false;
 
@@ -88,21 +91,6 @@ bool IsNeedChangeCallee(Function *F) {
     return true;
 
 }
-
-bool IsRecursiveCall(std::string callerName, std::string calleeName) {
-
-    long nameLength = calleeName.length();
-
-    if (callerName.length() > 7 &&
-        callerName.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
-        if (callerName.substr(7, nameLength) == calleeName) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
 
 Function *SearchFunctionByName(std::set<Function *> FuncSet,
                                std::string FuncName) {

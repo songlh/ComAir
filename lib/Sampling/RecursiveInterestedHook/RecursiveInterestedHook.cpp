@@ -28,6 +28,12 @@ static cl::opt<int> isSampling("is-sampling",
                                cl::init(0));
 
 
+static cl::opt<std::string> strFuncName(
+        "strFuncName",
+        cl::desc("The name of function to instrumention."), cl::Optional,
+        cl::value_desc("strFuncName"));
+
+
 /* local function */
 
 bool hasCallReturn(BasicBlock *BB) {
@@ -108,6 +114,20 @@ void RecursiveInterestedHook::SetupFunctions() {
         ArgTypes.clear();
     }
 
+    // aprof_return(int funcID, long numCost)
+    this->aprof_call_in = this->pModule->getFunction("aprof_call_in");
+//    assert(this->aprof_return != NULL);
+
+    if (!this->aprof_call_in) {
+        ArgTypes.push_back(this->IntType);
+        ArgTypes.push_back(this->LongType);
+        FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_call_in = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_call_in",
+                                              this->pModule);
+        this->aprof_call_in->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
+
     // aprof_return(int funcID, unsigned long callStack, unsigned long numCost)
     this->aprof_return = this->pModule->getFunction("aprof_return");
 //    assert(this->aprof_return != NULL);
@@ -144,22 +164,24 @@ void RecursiveInterestedHook::InstrumentCallBefore(Function *F) {
         BasicBlock *EntryBB = &*BI;
         Instruction *FirstInst = &*(EntryBB->getFirstInsertionPt());
         //  temp alloc
-        this->TNumCost = new AllocaInst(this->LongType, 0, "TNumCost", FirstInst);
-        this->TNumCost->setAlignment(8);
         LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, FirstInst);
-
         pLoadnumCost->setAlignment(8);
-        StoreInst *pStore = new StoreInst(pLoadnumCost, this->TNumCost, false, FirstInst);
-        pStore->setAlignment(8);
 
-        // cost++
-        pLoadnumCost = new LoadInst(this->numCost, "", false, FirstInst);
-        pLoadnumCost->setAlignment(8);
-        BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost, this->ConstantLong1, "add",
-                                                      FirstInst);
-        pStore = new StoreInst(pAdd, this->numCost, false, FirstInst);
-        pStore->setAlignment(8);
+        int FuncID = GetFunctionID(F);
 
+        ConstantInt *const_funId = ConstantInt::get(
+                this->pModule->getContext(),
+                APInt(32, StringRef(std::to_string(FuncID)), 10));
+
+        // call aprof_return
+        std::vector<Value *> vecParams;
+        vecParams.push_back(const_funId);
+        vecParams.push_back(pLoadnumCost);
+        CallInst *void_49 = CallInst::Create(this->aprof_call_in, vecParams, "", FirstInst);
+        void_49->setCallingConv(CallingConv::C);
+        void_49->setTailCall(false);
+        AttributeList void_PAL;
+        void_49->setAttributes(void_PAL);
         break;
     }
 }
@@ -175,23 +197,18 @@ void RecursiveInterestedHook::InstrumentReturn(Instruction *BeforeInst) {
 
     LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, BeforeInst);
     pLoadnumCost->setAlignment(8);
-
-    // callstack--
-    LoadInst *pLoadTNumCost = new LoadInst(this->TNumCost, "", false, BeforeInst);
-    pLoadTNumCost->setAlignment(8);
-
-    BinaryOperator *pCSAdd = BinaryOperator::Create(Instruction::Sub, pLoadnumCost, pLoadTNumCost, "sub",
-                                                    BeforeInst);
-    StoreInst *pStore = new StoreInst(pCSAdd, this->TNumCost, false, BeforeInst);
+    BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost, this->ConstantLong1, "add",
+                                                  BeforeInst);
+    StoreInst * pStore = new StoreInst(pAdd, this->numCost, false, BeforeInst);
     pStore->setAlignment(8);
 
-    pLoadTNumCost = new LoadInst(this->TNumCost, "", false, BeforeInst);
-    pLoadTNumCost->setAlignment(8);
+    pLoadnumCost = new LoadInst(this->numCost, "", false, BeforeInst);
+    pLoadnumCost->setAlignment(8);
 
     // call aprof_return
     std::vector<Value *> vecParams;
     vecParams.push_back(const_funId);
-    vecParams.push_back(pLoadTNumCost);
+    vecParams.push_back(pLoadnumCost);
     CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", BeforeInst);
     void_49->setCallingConv(CallingConv::C);
     void_49->setTailCall(false);
@@ -296,6 +313,14 @@ void RecursiveInterestedHook::SetupHooks() {
             continue;
         }
 
+        if (!IsRecursiveCall(Func)) {
+            continue;
+        }
+
+        if (!strFuncName.empty() && strFuncName != Func->getName().str()) {
+            continue;
+        }
+
         if (this->funNameIDFile)
             this->funNameIDFile << Func->getName().str()
                                 << ":" << GetFunctionID(Func) << "\n";
@@ -318,8 +343,29 @@ void RecursiveInterestedHook::SetupHooks() {
     }
 }
 
+bool RecursiveInterestedHook::hasRecursiveCall(Module &M) {
+
+    bool flag = false;
+
+    for (Module::iterator FI = M.begin(); FI != M.end(); FI++) {
+        Function *Func = &*FI;
+
+        if (IsRecursiveCall(Func)) {
+            errs() << Func->getName() << "\n";
+            flag = true;
+        }
+    }
+
+    return flag;
+}
 
 bool RecursiveInterestedHook::runOnModule(Module &M) {
+
+    if (!hasRecursiveCall(M)) {
+        errs() << "Current module has no recursive call,"
+                " please set a right bc file!" << "\n";
+        return false;
+    }
 
     if (strFileName.empty()) {
 
@@ -328,7 +374,7 @@ bool RecursiveInterestedHook::runOnModule(Module &M) {
 
     } else {
 
-        this->funNameIDFile.open(strFileName, std::ofstream::out | std::ofstream::app);
+        this->funNameIDFile.open(strFileName, std::ofstream::out);
     }
 
     this->pModule = &M;

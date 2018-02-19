@@ -42,7 +42,6 @@ void aprof_return(int funcID, unsigned long numCost) {
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
         sampling = aprof_geo(SAMPLING_RATE);
-//        printf("%d\n", sampling);
     }
 
     stack_top--;

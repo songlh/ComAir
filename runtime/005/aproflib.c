@@ -173,6 +173,9 @@ void aprof_init() {
 
 
 void aprof_write(void *memory_addr, unsigned long length) {
+    if (pL0 == NULL) {
+        aprof_init();
+    }
     unsigned long start_addr = (unsigned long) memory_addr;
     unsigned long end_addr = start_addr + length;
 
@@ -185,6 +188,9 @@ void aprof_write(void *memory_addr, unsigned long length) {
 
 
 void aprof_read(void *memory_addr, unsigned long length) {
+    if (pL0 == NULL) {
+        aprof_init();
+    }
 
     unsigned long start_addr = (unsigned long) memory_addr;
     unsigned long end_addr = start_addr + length;
@@ -249,7 +255,7 @@ void aprof_return(unsigned long numCost) {
 
     } else {
         // destroy  memory.
-        aprof_destroy_memory();
+        //aprof_destroy_memory();
     }
 
 }

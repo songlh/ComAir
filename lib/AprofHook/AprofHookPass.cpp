@@ -592,7 +592,7 @@ void AprofHook::InstrumentHooks(Function *Func, bool isOptimized) {
 
     assert(FuncID > 0);
 
-    //bool need_update_rms = false;
+
 
     // be carefull, there must be this order!
     InstrumentCostUpdater(Func, isOptimized);
@@ -752,6 +752,10 @@ void AprofHook::SetupHooks() {
     for (Module::iterator FI = this->pModule->begin(); FI != this->pModule->end(); FI++) {
 
         Function *Func = &*FI;
+
+        if (hasUnifiedUnreachableBlock(Func)) {
+            continue ;
+        }
 
         if (isSampling == 1) {
 

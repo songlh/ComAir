@@ -20,19 +20,16 @@ static RegisterPass<MarkFlagForAprofNoOpt> X(
 
 char MarkFlagForAprofNoOpt::ID = 0;
 
-void MarkFlagForAprofNoOpt::getAnalysisUsage(AnalysisUsage &AU) const 
-{
+void MarkFlagForAprofNoOpt::getAnalysisUsage(AnalysisUsage &AU) const {
 
 }
 
-MarkFlagForAprofNoOpt::MarkFlagForAprofNoOpt() : ModulePass(ID) 
-{
+MarkFlagForAprofNoOpt::MarkFlagForAprofNoOpt() : ModulePass(ID) {
 
 }
 
-void MarkFlagForAprofNoOpt::markFlag(Instruction * Inst, int Flag) 
-{
-	MDBuilder MDHelper(this->pModule->getContext());
+void MarkFlagForAprofNoOpt::markFlag(Instruction *Inst, int Flag) {
+    MDBuilder MDHelper(this->pModule->getContext());
     Constant *InsID = ConstantInt::get(this->IntType, Flag);
     SmallVector<Metadata *, 1> Vals;
     Vals.push_back(MDHelper.createConstant(InsID));
@@ -43,55 +40,39 @@ void MarkFlagForAprofNoOpt::markFlag(Instruction * Inst, int Flag)
 }
 
 
-bool MarkFlagForAprofNoOpt::runOnModule(Module &M) 
-{
-	this->pModule = &M;
-	this->IntType = IntegerType::get(this->pModule->getContext(), 32);
+bool MarkFlagForAprofNoOpt::runOnModule(Module &M) {
+    this->pModule = &M;
+    this->IntType = IntegerType::get(this->pModule->getContext(), 32);
 
 
-	for (Module::iterator FI = M.begin(); FI != M.end(); FI++) 
-	{
+    for (Module::iterator FI = M.begin(); FI != M.end(); FI++) {
         Function *Func = &*FI;
 
-        if(IsIgnoreFunc(Func))
-        {
-        	continue;
+        if (IsIgnoreFunc(Func)) {
+            continue;
         }
 
 
-        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) 
-        {
-        	for(BasicBlock::iterator II = BI->begin(); II != BI->end(); II ++ )
-        	{
-        		Instruction * Inst = &*II;
+        for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+            for (BasicBlock::iterator II = BI->begin(); II != BI->end(); II++) {
+                Instruction *Inst = &*II;
 
-        		switch(Inst->getOpcode())
-        		{
-        			case Instruction::Alloca: {
-        				markFlag(Inst, READ);
-        				break;
-        			}
-        			case Instruction::Load: {
-        				markFlag(Inst, READ);
-        				break;
-        			}
-        			case Instruction::Store: {
-        				markFlag(Inst, WRITE);
-        				break;
-        			}
+                switch (Inst->getOpcode()) {
+                    case Instruction::Alloca: {
+                        markFlag(Inst, READ);
+                        break;
+                    }
+                    case Instruction::Load: {
+                        markFlag(Inst, READ);
+                        break;
+                    }
+                    case Instruction::Store: {
+                        markFlag(Inst, WRITE);
+                        break;
+                    }
 
-        		} 
-        	}
-
+                }
+            }
         }
-
-
-
     }
-
-
-
-
-
-
 }

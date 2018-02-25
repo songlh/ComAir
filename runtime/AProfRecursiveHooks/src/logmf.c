@@ -10,6 +10,7 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
 
 struct stack_elem {
     int stack_index; // function id
@@ -117,7 +118,11 @@ void read_shared_momery() {
 
 int main() {
 
-    const char *FILENAME = "/tmp/aprof_recursive_logger.txt";
+    char FILENAME[] = "aprof_logger_XXXXXX";
+    int fd;
+    fd = mkstemp(FILENAME);
+    assert(fd > 0);
+
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, 4, QUIET);

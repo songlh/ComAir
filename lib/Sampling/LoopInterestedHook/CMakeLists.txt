@@ -1,6 +1,7 @@
 add_library(LoopInterestedHookPass MODULE
     # List your source files here.
         LoopInterestedHook.cpp
+        CloneLoopBodyPass.cpp
 )
 
 target_link_libraries(LoopInterestedHookPass CommonLib SupportLib)

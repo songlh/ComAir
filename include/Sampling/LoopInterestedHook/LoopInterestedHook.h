@@ -34,31 +34,34 @@ struct LoopInterestedHook : public ModulePass {
 
     void SetupFunctions();
 
-    void CollectInterestedLoopFunction();
-
     void SetupHooks();
 
     void InstrumentInit(Instruction *);
 
-    void InstrumentHooks(Function *, bool isOptimized = true);
+    void InstrumentInnerLoop(Loop * pInnerLoop, PostDominatorTree * PDT);
+    void AddHooksToInnerFunction(Function *pInnerFunction);
 
-    void InstrumentWrite(StoreInst *, Instruction *);
+    void RemapInstruction(Instruction *I, ValueToValueMapTy &VMap);
+
+    void CreateIfElseIfBlock(Loop * pInnerLoop, vector<BasicBlock *> & vecAdded);
+
+    void CloneInnerLoop(Loop * pLoop, vector<BasicBlock *> & vecAdd, ValueToValueMapTy & VMap);
+
+    void InstrumentHooks(Function *, bool isOptimized = true);
 
     void InstrumentRead(LoadInst *, Instruction *);
 
-    void InstrumentAlloc(Value *, Instruction *);
-
-    void InstrumentCallBefore(Function *pFunction);
+    void InstrumentWrite(StoreInst *, Instruction *);
 
     void InstrumentReturn(Instruction *m);
 
-    void InstrumentCostUpdater(Function *pFunction, bool isOptimized = true);
+    void InstrumentCostUpdater(Loop *pLoop);
 
-    void InstrumentRmsUpdater(Function *pFunction);
+    void InstrumentOuterLoop(Loop *pOutLoop);
 
-    void InstrumentRmsUpdater(Function *Callee, Instruction *pInst);
+    void CloneFunctionCalled();
 
-    void ProcessMemIntrinsic(MemIntrinsic *memInst);
+    bool bGivenOuterLoop;
 
     /* Module */
     Module *pModule;
@@ -71,36 +74,43 @@ struct LoopInterestedHook : public ModulePass {
     PointerType *VoidPointerType;
     /* ********** */
 
+    /* Global Variable */
+    GlobalVariable *numCost;
+    GlobalVariable *Switcher;
+    GlobalVariable *GeoRate;
+    GlobalVariable *SampleMonitor;
+    /* ***** */
+
     /* Function */
     // int aprof_init()
     Function *aprof_init;
-    // void aprof_increment_cost()
-    Function *aprof_increment_cost;
-    // void aprof_increment_rms
-    Function *aprof_increment_rms;
-    // void aprof_write(void *memory_addr, unsigned int length)
-    Function *aprof_write;
-    // void aprof_read(void *memory_addr, unsigned int length)
+
+    // void aprof_read(void *memory_addr, unsigned long length, int sample)
     Function *aprof_read;
-    // void aprof_call_before(char *funcName)
-    Function *aprof_call_before;
-    // void aprof_return()
+    // void aprof_read(void *memory_addr, unsigned long length, int sample)
+    Function *aprof_write;
+    // void aprof_return(unsigned long numCost, int sample)
     Function *aprof_return;
+
+    Function *aprof_geo;
     /* ********** */
 
     /* Constant */
     ConstantInt *ConstantLong0;
+    ConstantInt *ConstantInt0;
     ConstantInt *ConstantLong1;
+    ConstantInt *ConstantInt1;
+    ConstantInt *ConstantInt2;
+    ConstantInt *ConstantSamplingRate;
     /* ********** */
-
-    /* Alloc Inst */
-    AllocaInst *BBAllocInst;
-    AllocaInst *RmsAllocInst;
-    /* **** */
 
     /* OutPut File */
     ofstream funNameIDFile;
     /* */
+
+    Loop * pOuterLoop;
+
+    std::set<int> MonitoredInst;
 
 };
 

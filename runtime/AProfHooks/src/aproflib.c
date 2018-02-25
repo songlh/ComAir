@@ -271,7 +271,7 @@ void aprof_read(void *memory_addr, unsigned long length) {
     unsigned long end_addr = start_addr + length;
     int j;
 
-    log_trace("aprof_read: funcID %d, memory_adrr is %ld, lenght is %ld",
+    log_trace("aprof_read: funcID %d, memory_adrr is %ld, length is %ld",
               shadow_stack[stack_top].funcId, start_addr, length);
 
     for (; i < end_addr; i++) {

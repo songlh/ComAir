@@ -1,6 +1,8 @@
 add_library(CommonLib STATIC
         # List your source files here.
-       Helper.cpp
+        Helper.cpp
+        Search.cpp
+        Loop.cpp
         )
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).

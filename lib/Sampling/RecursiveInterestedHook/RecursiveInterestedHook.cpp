@@ -145,7 +145,6 @@ void RecursiveInterestedHook::SetupFunctions() {
 
 }
 
-
 void RecursiveInterestedHook::InstrumentInit(Instruction *firstInst) {
 
     CallInst *aprof_init_call = CallInst::Create(this->aprof_init, "", firstInst);
@@ -155,7 +154,6 @@ void RecursiveInterestedHook::InstrumentInit(Instruction *firstInst) {
     aprof_init_call->setAttributes(int32_call_PAL);
 
 }
-
 
 void RecursiveInterestedHook::InstrumentCallBefore(Function *F) {
 
@@ -185,7 +183,6 @@ void RecursiveInterestedHook::InstrumentCallBefore(Function *F) {
         break;
     }
 }
-
 
 void RecursiveInterestedHook::InstrumentReturn(Instruction *BeforeInst) {
 

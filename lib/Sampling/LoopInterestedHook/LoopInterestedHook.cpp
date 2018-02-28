@@ -130,6 +130,7 @@ void LoopInterestedHook::SetupConstants() {
     this->ConstantInt0 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("0"), 10));
     this->ConstantInt1 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("1"), 10));
     this->ConstantInt2 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("2"), 10));
+    this->ConstantInt3 = ConstantInt::get(pModule->getContext(), APInt(32, StringRef("3"), 10));
     this->ConstantSamplingRate = ConstantInt::get(pModule->getContext(),
                                                   APInt(32, StringRef(std::to_string(SamplingRate)), 10));
 
@@ -267,8 +268,47 @@ void LoopInterestedHook::InstrumentCostUpdater(Loop *pLoop) {
     pStore->setAlignment(8);
 }
 
+void LoopInterestedHook::AddHooksToOuterFunction(Function *Func) {
+
+    if (Func) {
+
+        for (Function::iterator BI = Func->begin(); BI != Func->end(); ++BI) {
+
+            BasicBlock *BB = &*BI;
+
+            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+                Instruction *Inst = &*II;
+
+                switch (Inst->getOpcode()) {
+
+                    case Instruction::Ret: {
+                        std::vector<Value *> vecParams;
+                        LoadInst *bb_pLoad = new LoadInst(this->numCost, "", false, 8, Inst);
+//                        LoadInst *pLoad = new LoadInst(this->ConstantInt3, "", false, 4, Inst);
+                        vecParams.push_back(bb_pLoad);
+                        vecParams.push_back(this->ConstantInt3);
+                        CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", Inst);
+                        void_49->setCallingConv(CallingConv::C);
+                        void_49->setTailCall(false);
+                        AttributeList void_PAL;
+                        void_49->setAttributes(void_PAL);
+                    }
+                        break;
+                }
+            }
+        }
+
+    } else {
+
+        errs() << "Could not find outer loop function!" << "\n";
+    }
+
+}
+
 void LoopInterestedHook::InstrumentOuterLoop(Loop *pOuterLoop) {
     InstrumentCostUpdater(pOuterLoop);
+    AddHooksToOuterFunction(pOuterLoop->getHeader()->getParent());
 
 }
 
@@ -629,14 +669,14 @@ void LoopInterestedHook::AddHooksToInnerFunction(Function *pInnerFunction) {
 
             switch (Inst->getOpcode()) {
 
-//                case Instruction::Load: {
-//                    if (BBName.find(".CPI") != std::string::npos) {
-//                        if (LoadInst *pLoad = dyn_cast<LoadInst>(Inst)) {
-//                            InstrumentRead(pLoad, Inst);
-//                        }
-//                    }
-//                    break;
-//                }
+                case Instruction::Load: {
+                    if (BBName.find(".CPI") != std::string::npos) {
+                        if (LoadInst *pLoad = dyn_cast<LoadInst>(Inst)) {
+                            InstrumentRead(pLoad, Inst);
+                        }
+                    }
+                    break;
+                }
 
 //                case Instruction::Store: {
 //                    if (BBName.find(".CPI") != std::string::npos) {
@@ -681,19 +721,6 @@ void LoopInterestedHook::InstrumentInnerLoop(Loop *pInnerLoop, PostDominatorTree
 
     //add loop related hooks
     AddHooksToInnerFunction(pInnerLoop->getHeader()->getParent());
-
-}
-
-void LoopInterestedHook::InstrumentHooks(Function *Func, bool isOptimized) {
-
-    int FuncID = GetFunctionID(Func);
-
-    if (FuncID <= 0) {
-        errs() << Func->getName() << "\n";
-    }
-
-    assert(FuncID > 0);
-
 
 }
 

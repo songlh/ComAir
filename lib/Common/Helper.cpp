@@ -1,6 +1,8 @@
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DebugInfo.h"
 #include "llvm/IR/MDBuilder.h"
 
 #include "Common/Constant.h"
@@ -86,6 +88,32 @@ int GetInstructionID(Instruction *II) {
     return -1;
 }
 
+
+int GetLoopID(Loop* loop) {
+
+    BasicBlock *pLoopHeader = loop->getHeader();
+
+    for (BasicBlock::iterator II = pLoopHeader->begin(); II != pLoopHeader->end(); II++) {
+
+        Instruction *Inst = &*II;
+        MDNode *Node = Inst->getMetadata("loop_id");
+        if (!Node) {
+            continue;
+        }
+
+        assert(Node->getNumOperands() == 1);
+        const Metadata *MD = Node->getOperand(0);
+        if (auto *MDV = dyn_cast<ValueAsMetadata>(MD)) {
+            Value *V = MDV->getValue();
+            ConstantInt *CI = dyn_cast<ConstantInt>(V);
+            assert(CI);
+            return CI->getZExtValue();
+        }
+    }
+
+    return -1;
+}
+
 int GetInstructionInsertFlag(Instruction *II) {
 
     MDNode *Node = II->getMetadata(APROF_INSERT_FLAG);
@@ -144,10 +172,6 @@ bool IsIgnoreFunc(Function *F) {
     }
 
     std::string FuncName = F->getName().str();
-
-//    if (FuncName == "JS_Assert") {
-//        return true;
-//    }
 
     if (FuncName.substr(0, 5) == "aprof") {
         return true;
@@ -309,4 +333,21 @@ bool IsRecursiveCall(Function *F) {
     }
 
     return false;
+}
+
+
+std::string printSrcCodeInfo(Instruction *pInst) {
+    const DILocation *DIL = pInst->getDebugLoc();
+
+    if (!DIL)
+        return "";
+
+    char pPath[200];
+
+    std::string sFileName = DIL->getDirectory().str() + "/" + DIL->getFilename().str();
+    realpath(sFileName.c_str(), pPath);
+    sFileName = std::string(sFileName);
+    unsigned int numLine = DIL->getLine();
+    return sFileName + ": " + std::to_string(numLine);
+
 }

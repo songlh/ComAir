@@ -61,36 +61,11 @@ void aprof_write(void *memory_addr, unsigned long length);
 
 void aprof_read(void *memory, unsigned long length);
 
-void aprof_increment_cost();
-
 void aprof_increment_rms(unsigned long length);
 
 void aprof_call_before(int funcId);
 
-void aprof_collect();
-
-void aprof_call_after();
-
 void aprof_return(unsigned long numCost);
-
-/*---- sampling generator ----*/
-
-//===========================================================================
-//=  Function to generate geometrically distributed random variables        =
-//=    - Input:  Probability of success p                                   =
-//=    - Output: Returns with geometrically distributed random variable     =
-//===========================================================================
-
-int aprof_geo(int iRate);            // Returns a geometric random variable
-
-//=========================================================================
-//= Multiplicative LCG for generating uniform(0.0, 1.0) random numbers    =
-//=   - x_n = 7^5*x_(n-1)mod(2^31 - 1)                                    =
-//=   - With x seeded to 1 the 10000th x value should be 1043618065       =
-//=   - From R. Jain, "The Art of Computer Systems Performance Analysis," =
-//=     John Wiley & Sons, 1991. (Page 443, Figure 26.2)                  =
-//=========================================================================
-static double aprof_rand_val(int seed);    // Jain's RNG
 
 /*---- end ----*/
 

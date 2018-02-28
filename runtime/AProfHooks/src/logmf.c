@@ -121,7 +121,7 @@ void read_shared_momery() {
 
 int main() {
 
-    char FILENAME[] = "/tmp/aprof_logger_XXXXXX";
+    char FILENAME[] = "aprof_logger_XXXXXX";
     int fd;
     fd = mkstemp(FILENAME);
     assert(fd > 0);

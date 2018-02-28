@@ -44,7 +44,7 @@ do_sampling () {
 
 do_not_sampling () {
 
- /HDD/llvm5.0/install/bin/clang -emit-llvm -c -g ${TEST_PROGRAM} -o ${BC_FILE}
+ /HDD/llvm5.0/install/bin/clang -emit-llvm -c -g -O0 ${TEST_PROGRAM} -o ${BC_FILE}
 
  /HDD/llvm5.0/install/bin/opt -load ${HOME}/lib/IDAssigner/libIDAssignerPass.so -tag-id ${BC_FILE} > ${BC_ID_FILE}
 

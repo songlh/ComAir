@@ -49,9 +49,18 @@ void aprof_read(void *memory_addr, unsigned long length) {
 }
 
 
-
 void aprof_return(unsigned long numCost, int sample) {
-    if (sample != last_sample) {
+    if (sample == 3) {
+        // this is for last one to record last num cost!
+        store_stack[0].flag = 'o';
+        store_stack[0].start_addr = sample;
+        // carefull !!!
+        store_stack[0].length = numCost;
+        memcpy(pcBuffer, &(store_stack), store_size);
+        pcBuffer += store_size;
+
+    } else if (sample != last_sample) {
+
         last_sample = sample;
         store_stack[0].flag = 'e';
         store_stack[0].start_addr = sample;
@@ -60,6 +69,25 @@ void aprof_return(unsigned long numCost, int sample) {
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
     }
+}
+
+void aprof_loop_in(int funcId, int loopId) {
+    store_stack[0].flag = 'i';
+    store_stack[0].start_addr = funcId;
+    // carefull !!!
+    store_stack[0].length = loopId;
+    memcpy(pcBuffer, &(store_stack), store_size);
+    pcBuffer += store_size;
+}
+
+
+void aprof_loop_out(int funcId, int loopId) {
+    store_stack[0].flag = 'x';
+    store_stack[0].start_addr = funcId;
+    // carefull !!!
+    store_stack[0].length = loopId;
+    memcpy(pcBuffer, &(store_stack), store_size);
+    pcBuffer += store_size;
 }
 
 

@@ -50,9 +50,9 @@ static cl::opt<std::string> strFuncName("strFunc",
                                         cl::desc("Function Name"), cl::Optional,
                                         cl::value_desc("strFuncName"));
 
-//static cl::opt<std::string> strLoopHeader("strLoopHeader",
-//                                          cl::desc("Block Name for Inner Loop Header"), cl::Optional,
-//                                          cl::value_desc("strLoopHeader"));
+static cl::opt<std::string> strCloneLoopHeader("strCloneLoopHeader",
+                                          cl::desc("Block Name for Inner Loop Header"), cl::Optional,
+                                          cl::value_desc("strCloneLoopHeader"));
 
 
 char CloneLoopBodyPass::ID = 0;
@@ -429,8 +429,8 @@ bool CloneLoopBodyPass::runOnModule(Module &M) {
     Loop *pLoop;
 
 
-//    BasicBlock *pHeader = SearchBlockByName(pFunction, strLoopHeader);
-    BasicBlock *pHeader = SearchBlockByName(pFunction, "for.cond.CPI");
+    BasicBlock *pHeader = SearchBlockByName(pFunction, strCloneLoopHeader);
+//    BasicBlock *pHeader = SearchBlockByName(pFunction, "for.cond.CPI");
 
     if (pHeader == NULL) {
         errs() << "Cannot find the given loop header!\n";
@@ -459,8 +459,8 @@ bool CloneLoopBodyPass::runOnModule(Module &M) {
 
     CloneLoopBody(pLoop, vecInst);
 
-    BasicBlock *pNewHeader = SearchBlockByName(pFunction, ".oldheader.CPI2");
-    pNewHeader->dump();
+//    BasicBlock *pNewHeader = SearchBlockByName(pFunction, ".oldheader.CPI2");
+//    pNewHeader->dump();
 
     return false;
 

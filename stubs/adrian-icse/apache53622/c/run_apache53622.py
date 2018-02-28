@@ -84,8 +84,8 @@ def calculate_curve_fit():
     :return:
     """
 
-    def fund(x, a, b):
-        return x ** a + b
+    def fund(x, a, b, c):
+        return a * x ** b + c
 
     df = pd.read_csv('apache35622_result.csv')
     df = df.loc[df['func_id'] == 10]
@@ -98,11 +98,11 @@ def calculate_curve_fit():
     popt, pcov = curve_fit(fund, xdata, ydata)
     # print y = x^a +/- b
     op_code = '+'
-    if popt[1] < 0:
+    if popt[2] < 0:
         op_code = '-'
-        popt[1] = popt[1] * -1
+        popt[2] = popt[2] * -1
 
-    to_str = ['y = x^', '%.2f' % popt[0], ' ', op_code, ' ', '%.2f' % popt[1]]
+    to_str = ['y = ', '%.2f' % popt[0], ' * x^', '%.2f' % popt[1], ' ', op_code, ' ', '%.2f' % popt[2]]
     print(''.join(to_str))
 
 

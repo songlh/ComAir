@@ -39,7 +39,10 @@ struct LoopInterestedHook : public ModulePass {
     void InstrumentInit(Instruction *);
 
     void InstrumentInnerLoop(Loop * pInnerLoop, PostDominatorTree * PDT);
+
     void AddHooksToInnerFunction(Function *pInnerFunction);
+
+    void AddHooksToOuterFunction(Function *pOuterFunction);
 
     void RemapInstruction(Instruction *I, ValueToValueMapTy &VMap);
 
@@ -101,6 +104,7 @@ struct LoopInterestedHook : public ModulePass {
     ConstantInt *ConstantLong1;
     ConstantInt *ConstantInt1;
     ConstantInt *ConstantInt2;
+    ConstantInt *ConstantInt3;
     ConstantInt *ConstantSamplingRate;
     /* ********** */
 

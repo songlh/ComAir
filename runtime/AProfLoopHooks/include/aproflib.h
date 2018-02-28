@@ -29,7 +29,7 @@
 struct log_address {
     unsigned long  start_addr;
     unsigned long  length;
-    char flag; // r -> read; w->write, e->return
+    char flag; // r -> read; w->write, e->return, o->outer return, i ->loop_in, x->loop_out
 };
 
 void aprof_init();
@@ -39,6 +39,10 @@ void aprof_write(void *memory_addr, unsigned long length);
 void aprof_read(void *memory_addr, unsigned long length);
 
 void aprof_return(unsigned long numCost, int sample);
+
+void aprof_loop_in(int funcId, int loopId);
+
+void aprof_loop_out(int funcId, int loopId);
 
 /*---- sampling generator ----*/
 

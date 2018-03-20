@@ -121,6 +121,7 @@ void RecursiveInterestedHook::SetupFunctions() {
     if (!this->aprof_call_in) {
         ArgTypes.push_back(this->IntType);
         ArgTypes.push_back(this->LongType);
+        ArgTypes.push_back(this->LongType);
         FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_call_in = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_call_in",
                                               this->pModule);
@@ -135,7 +136,7 @@ void RecursiveInterestedHook::SetupFunctions() {
     if (!this->aprof_return) {
         ArgTypes.push_back(this->IntType);
         ArgTypes.push_back(this->LongType);
-        //ArgTypes.push_back(this->LongType);
+        ArgTypes.push_back(this->LongType);
         FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_return = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return",
                                               this->pModule);
@@ -162,8 +163,20 @@ void RecursiveInterestedHook::InstrumentCallBefore(Function *F) {
         BasicBlock *EntryBB = &*BI;
         Instruction *FirstInst = &*(EntryBB->getFirstInsertionPt());
         //  temp alloc
-        LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, FirstInst);
-        pLoadnumCost->setAlignment(8);
+        LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, 8, FirstInst);
+        BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
+                                                      this->ConstantLong1, "add",
+                                                      FirstInst);
+        StoreInst * pStore = new StoreInst(pAdd, this->numCost, false, 8, FirstInst);
+        pLoadnumCost = new LoadInst(this->numCost, "", false, 8, FirstInst);
+
+        LoadInst *pLoadcallStack = new LoadInst(this->callStack, "", false, 8, FirstInst);
+        pAdd = BinaryOperator::Create(Instruction::Add, pLoadcallStack,
+                                                      this->ConstantLong1, "add",
+                                                      FirstInst);
+
+        new StoreInst(pAdd, this->callStack, false, 8, FirstInst);
+        pLoadcallStack = new LoadInst(this->callStack, "", false, 8, FirstInst);
 
         int FuncID = GetFunctionID(F);
 
@@ -175,6 +188,7 @@ void RecursiveInterestedHook::InstrumentCallBefore(Function *F) {
         std::vector<Value *> vecParams;
         vecParams.push_back(const_funId);
         vecParams.push_back(pLoadnumCost);
+        vecParams.push_back(pLoadcallStack);
         CallInst *void_49 = CallInst::Create(this->aprof_call_in, vecParams, "", FirstInst);
         void_49->setCallingConv(CallingConv::C);
         void_49->setTailCall(false);
@@ -192,26 +206,97 @@ void RecursiveInterestedHook::InstrumentReturn(Instruction *BeforeInst) {
             this->pModule->getContext(),
             APInt(32, StringRef(std::to_string(FuncID)), 10));
 
-    LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, BeforeInst);
-    pLoadnumCost->setAlignment(8);
-    BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost, this->ConstantLong1, "add",
-                                                  BeforeInst);
-    StoreInst * pStore = new StoreInst(pAdd, this->numCost, false, BeforeInst);
-    pStore->setAlignment(8);
+    // call_stack updater
+    LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, 8, BeforeInst);
 
-    pLoadnumCost = new LoadInst(this->numCost, "", false, BeforeInst);
-    pLoadnumCost->setAlignment(8);
+    LoadInst *pLoadcallStack = new LoadInst(this->callStack, "", false, 8, BeforeInst);
 
     // call aprof_return
     std::vector<Value *> vecParams;
     vecParams.push_back(const_funId);
     vecParams.push_back(pLoadnumCost);
+    vecParams.push_back(pLoadcallStack);
     CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", BeforeInst);
     void_49->setCallingConv(CallingConv::C);
     void_49->setTailCall(false);
     AttributeList void_PAL;
     void_49->setAttributes(void_PAL);
+
+    BinaryOperator *pDec = BinaryOperator::Create(Instruction::Add, pLoadcallStack,
+                                                  this->ConstantLongN1, "dec",
+                                                  BeforeInst);
+    new StoreInst(pDec, this->callStack, false, 8, BeforeInst);
 }
+
+//void RecursiveInterestedHook::InstrumentHooks(Function *Func) {
+//
+//    int FuncID = GetFunctionID(Func);
+//
+//    if (FuncID <= 0) {
+//        errs() << Func->getName() << "\n";
+//    }
+//
+//    assert(FuncID > 0);
+//
+//    //bool need_update_rms = false;
+//
+//    // be carefull, there must be this order!
+//    InstrumentCallBefore(Func);
+//
+//    int _PreInst = 0;
+//
+//    for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
+//
+//        BasicBlock *BB = &*BI;
+//        Instruction *PreInst;
+//
+//        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+//            Instruction *Inst = &*II;
+//
+//            if (GetInstructionID(Inst) == -1) {
+//                continue;
+//            }
+//
+//            switch (Inst->getOpcode()) {
+//
+//                case Instruction::Ret: {
+//                    InstrumentReturn(Inst);
+//                    break;
+//                }
+//
+//                case Instruction::Br: {
+//                    // if br label %UnifiedUnreachableBlock
+//                    BranchInst *BrInst = dyn_cast<BranchInst>(Inst);
+//
+//                    if (BrInst->getNumOperands() == 1 &&
+//                        BrInst->getOperand(0)->getName() == "UnifiedUnreachableBlock") {
+//
+//                        if (PreInst && _PreInst != GetInstructionID(PreInst)) {
+////                                errs() << "1" << Func->getName() << *PreInst << "\n";
+//                            InstrumentReturn(PreInst);
+//                            _PreInst = GetInstructionID(PreInst);
+//                        }
+//                    }
+//                    break;
+//                }
+//
+//                case Instruction::Unreachable: {
+//                    // if br label %UnifiedUnreachableBlock
+//                    if (PreInst && _PreInst != GetInstructionID(PreInst)) {
+////                            errs() << "2" << Func->getName() << *PreInst << "\n";
+////                            Inst->getParent()->dump();
+//                        InstrumentReturn(PreInst);
+//                        _PreInst = GetInstructionID(PreInst);
+//                    }
+//                    break;
+//                }
+//            }
+//
+//            PreInst = Inst;
+//        }
+//    }
+//
+//}
 
 void RecursiveInterestedHook::InstrumentHooks(Function *Func) {
 
@@ -228,12 +313,9 @@ void RecursiveInterestedHook::InstrumentHooks(Function *Func) {
     // be carefull, there must be this order!
     InstrumentCallBefore(Func);
 
-    int _PreInst = 0;
-
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
         BasicBlock *BB = &*BI;
-        Instruction *PreInst;
 
         for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
             Instruction *Inst = &*II;
@@ -248,40 +330,12 @@ void RecursiveInterestedHook::InstrumentHooks(Function *Func) {
                     InstrumentReturn(Inst);
                     break;
                 }
-
-                case Instruction::Br: {
-                    // if br label %UnifiedUnreachableBlock
-                    BranchInst *BrInst = dyn_cast<BranchInst>(Inst);
-
-                    if (BrInst->getNumOperands() == 1 &&
-                        BrInst->getOperand(0)->getName() == "UnifiedUnreachableBlock") {
-
-                        if (PreInst && _PreInst != GetInstructionID(PreInst)) {
-//                                errs() << "1" << Func->getName() << *PreInst << "\n";
-                            InstrumentReturn(PreInst);
-                            _PreInst = GetInstructionID(PreInst);
-                        }
-                    }
-                    break;
-                }
-
-                case Instruction::Unreachable: {
-                    // if br label %UnifiedUnreachableBlock
-                    if (PreInst && _PreInst != GetInstructionID(PreInst)) {
-//                            errs() << "2" << Func->getName() << *PreInst << "\n";
-//                            Inst->getParent()->dump();
-                        InstrumentReturn(PreInst);
-                        _PreInst = GetInstructionID(PreInst);
-                    }
-                    break;
-                }
             }
-
-            PreInst = Inst;
         }
     }
-
 }
+
+
 
 void RecursiveInterestedHook::SetupInit() {
     // all set up operation
@@ -314,9 +368,9 @@ void RecursiveInterestedHook::SetupHooks() {
             continue;
         }
 
-        if (!strFuncName.empty() && strFuncName != Func->getName().str()) {
-            continue;
-        }
+//        if (!strFuncName.empty() && strFuncName != Func->getName().str()) {
+//            continue;
+//        }
 
         if (this->funNameIDFile)
             this->funNameIDFile << Func->getName().str()

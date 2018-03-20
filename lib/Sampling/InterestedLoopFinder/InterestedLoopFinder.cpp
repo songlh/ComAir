@@ -290,6 +290,7 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
                     continue;
 
                 std::string str = printSrcCodeInfo(inst);
+                errs() << str << "\n";
                 loopCounterFile << "FuncID: "<< std::to_string(GetFunctionID(F)) << "; "
                                 << "LoopID: " << std::to_string(GetLoopID(loop)) << "; "
                                 << "FuncName: " << F->getName().str() << "; " << str << "\n";

@@ -36,4 +36,6 @@ bool IsRecursiveCall(Function *F);
 
 std::string printSrcCodeInfo(Instruction *pInst);
 
+std::string getFileNameForInstruction(Instruction *pInst);
+
 #endif //COMAIR_HELPER_H

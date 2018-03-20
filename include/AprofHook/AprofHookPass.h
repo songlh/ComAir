@@ -48,6 +48,8 @@ struct AprofHook : public ModulePass {
 
     void InstrumentReturn(Instruction *m);
 
+    void InstrumentFinal(Function *mainFunc);
+
     void InstrumentCostUpdater(Function *pFunction, bool isOptimized = true);
 
     void InstrumentRmsUpdater(Function *pFunction);
@@ -84,6 +86,8 @@ struct AprofHook : public ModulePass {
     Function *aprof_call_before;
     // void aprof_return()
     Function *aprof_return;
+    // void aprof_final()
+    Function *aprof_final;
     /* ********** */
 
     /* Constant */

@@ -9,6 +9,7 @@
 
 
 using namespace llvm;
+using namespace std;
 
 struct MakeFunctionInline : public ModulePass
 {
@@ -17,6 +18,8 @@ struct MakeFunctionInline : public ModulePass
 
     virtual void getAnalysisUsage(AnalysisUsage &AU) const;
     virtual bool runOnModule(Module& M);
+
+//    void InlineFunction(std);
 
 };
 

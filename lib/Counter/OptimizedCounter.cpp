@@ -10,16 +10,17 @@
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
-#include "BBProfiling/BBProfiling.h"
+#include "Counter/OptimizedCounter.h"
 
 using namespace std;
 
-static RegisterPass<BBProfiling> X("bb-profiling", "profiling executed basic blocks", true, true);
+static RegisterPass<BBProfiling> X("bb-counter", "counter basic blocks", true, true);
 
 //
 unsigned long numTotalBB;
 unsigned long numTotalInst;
 
+/* local function */
 void getExitBlock(Function *pFunc, vector<BasicBlock *> &exitBlocks) {
     exitBlocks.clear();
 
@@ -34,7 +35,6 @@ void getExitBlock(Function *pFunc, vector<BasicBlock *> &exitBlocks) {
     assert(exitBlocks.size() == 1);
 }
 
-
 int getExitBlockSize(Function *pFunc) {
     int ExistBBSize = 0;
 
@@ -47,7 +47,7 @@ int getExitBlockSize(Function *pFunc) {
     }
     return ExistBBSize;
 }
-
+/* local function */
 
 BasicBlock *BBProfilingNode::getBlock() {
     return _basicBlock;
@@ -60,7 +60,6 @@ BBProfilingNode::NodeColor BBProfilingNode::getColor() {
 void BBProfilingNode::setColor(BBProfilingNode::NodeColor color) {
     _color = color;
 }
-
 
 BBPFEdgeIterator BBProfilingNode::predBegin() {
     return _predEdges.begin();
@@ -86,11 +85,9 @@ unsigned BBProfilingNode::getNumberSuccEdges() {
     return _succEdges.size();
 }
 
-
 void BBProfilingNode::addPredEdge(BBProfilingEdge *edge) {
     _predEdges.push_back(edge);
 }
-
 
 void BBProfilingNode::removePredEdge(BBProfilingEdge *edge) {
     removeEdge(_predEdges, edge);
@@ -104,7 +101,6 @@ void BBProfilingNode::addSuccEdge(BBProfilingEdge *edge) {
     _succEdges.push_back(edge);
 }
 
-
 void BBProfilingNode::removeSuccEdge(BBProfilingEdge *edge) {
     removeEdge(_succEdges, edge);
 }
@@ -112,7 +108,6 @@ void BBProfilingNode::removeSuccEdge(BBProfilingEdge *edge) {
 void BBProfilingNode::clearSuccEdge() {
     _succEdges.clear();
 }
-
 
 string BBProfilingNode::getName() {
     stringstream name;
@@ -131,7 +126,6 @@ string BBProfilingNode::getName() {
     return name.str();
 }
 
-
 void BBProfilingNode::removeEdge(BBPFEdgeVector &v, BBProfilingEdge *e) {
     for (BBPFEdgeIterator i = v.begin(), end = v.end(); i != end; i++) {
         if ((*i) == e) {
@@ -140,7 +134,6 @@ void BBProfilingNode::removeEdge(BBPFEdgeVector &v, BBProfilingEdge *e) {
         }
     }
 }
-
 
 BBProfilingNode *BBProfilingEdge::getSource() const {
     return _source;
@@ -178,7 +171,6 @@ long BBProfilingEdge::getIncrement() {
     return _increment;
 }
 
-
 void BBProfilingEdge::setIncrement(long inc) {
     _increment = inc;
 }
@@ -186,7 +178,6 @@ void BBProfilingEdge::setIncrement(long inc) {
 unsigned BBProfilingEdge::getDuplicateNumber() {
     return _duplicateNumber;
 }
-
 
 void BBProfilingGraph::init() {
     //BBPFBlockNodeMap inGraph;
@@ -266,7 +257,6 @@ BBProfilingNode *BBProfilingGraph::addNode(BasicBlock *BB) {
 
 }
 
-
 BBProfilingEdge *
 BBProfilingGraph::createEdge(BBProfilingNode *source, BBProfilingNode *target, unsigned duplicateCount) {
     return new BBProfilingEdge(source, target, duplicateCount);
@@ -331,7 +321,6 @@ unsigned BBProfilingGraph::getEdgeNum() {
     return _edges.size();
 }
 
-
 unsigned BBProfilingGraph::getNodeNum() {
     return _nodes.size();
 }
@@ -381,7 +370,6 @@ void BBProfilingGraph::splitNotExitBlock() {
         edge->setWeight(1);
     }
 }
-
 
 void BBProfilingGraph::calculateSpanningTree() {
     map<BBProfilingNode *, unsigned> C;
@@ -502,7 +490,6 @@ void BBProfilingGraph::calculateChordIncrements() {
     }
 }
 
-
 void BBProfilingGraph::calculateChordIncrementsDfs(long weight, BBProfilingNode *v, BBProfilingEdge *e) {
     BBProfilingEdge *f;
 
@@ -533,7 +520,6 @@ void BBProfilingGraph::calculateChordIncrementsDfs(long weight, BBProfilingNode 
     }
 
 }
-
 
 int BBProfilingGraph::calculateChordIncrementsDir(BBProfilingEdge *e, BBProfilingEdge *f) {
     if (e == NULL) {
@@ -705,7 +691,6 @@ void BBProfiling::SetupHooks(Module *pModule) {
 
 }
 
-
 bool BBProfiling::runOnFunction(Function &F) {
     if (F.getName() == "JS_Assert") {
         return false;
@@ -790,9 +775,6 @@ bool BBProfiling::runOnModule(Module &M) {
 
         changed |= runOnFunction(*FI);
     }
-
-//    Function *pMain = M.getFunction("main");
-//    InstrumentResultDumper(pMain);
 
     errs() << "after optimizing bb:" << numTotalInst << "\n";
     errs() << "bb total:" << numTotalBB << "\n";

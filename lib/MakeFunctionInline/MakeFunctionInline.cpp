@@ -23,6 +23,11 @@ static RegisterPass<MakeFunctionInline> X(
 static cl::opt<int> libInline("lib-inline",
                               cl::desc("runtime lib inline."),
                               cl::init(1));
+
+static cl::opt<std::string> strFuncName("strFunc",
+                                             cl::desc("Inline Function Name"), cl::Optional,
+                                             cl::value_desc("strInnerFuncName"));
+
 int MAX_BB_SIZE = 100;
 
 /* local function */
@@ -59,7 +64,7 @@ bool MakeFunctionInline::runOnModule(Module &M) {
 
     std::set<std::string> BCInlineFuncStr = {
             "aprof_read", "aprof_write", "aprof_increment_rms",
-            "aprof_init", "aprof_call_before", "aprof_return", "aprof_geo"
+            "aprof_init", "aprof_call_before", "aprof_return", "aprof_geo", "aprof_final"
     };
 
 

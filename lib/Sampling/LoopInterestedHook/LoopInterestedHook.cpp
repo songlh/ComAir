@@ -207,8 +207,6 @@ void LoopInterestedHook::SetupFunctions() {
         ArgTypes.clear();
     }
 
-
-
     // aprof_return
     this->aprof_return = this->pModule->getFunction("aprof_return");
 //    assert(this->aprof_return != NULL);
@@ -285,7 +283,6 @@ void LoopInterestedHook::AddHooksToOuterFunction(Function *Func) {
                     case Instruction::Ret: {
                         std::vector<Value *> vecParams;
                         LoadInst *bb_pLoad = new LoadInst(this->numCost, "", false, 8, Inst);
-//                        LoadInst *pLoad = new LoadInst(this->ConstantInt3, "", false, 4, Inst);
                         vecParams.push_back(bb_pLoad);
                         vecParams.push_back(this->ConstantInt3);
                         CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", Inst);
@@ -308,7 +305,7 @@ void LoopInterestedHook::AddHooksToOuterFunction(Function *Func) {
 
 void LoopInterestedHook::InstrumentOuterLoop(Loop *pOuterLoop) {
     InstrumentCostUpdater(pOuterLoop);
-    AddHooksToOuterFunction(pOuterLoop->getHeader()->getParent());
+//    AddHooksToOuterFunction(pOuterLoop->getHeader()->getParent());
 
 }
 
@@ -504,7 +501,8 @@ void LoopInterestedHook::CloneInnerLoop(Loop *pLoop, vector<BasicBlock *> &vecAd
 
     //add to the else if body
     BasicBlock *pCondition1 = vecAdd[0];
-    BasicBlock *pElseBody = vecAdd[6];
+    BasicBlock *pElseBody = vecAdd[2];
+//    BasicBlock *pElseBody = vecAdd[6];
 
     BasicBlock *pClonedHeader = cast<BasicBlock>(VMap[pLoop->getHeader()]);
 
@@ -563,20 +561,101 @@ void LoopInterestedHook::CloneInnerLoop(Loop *pLoop, vector<BasicBlock *> &vecAd
     }
 }
 
+//void LoopInterestedHook::CreateIfElseIfBlock(Loop *pInnerLoop, vector<BasicBlock *> &vecAdded) {
+//    BasicBlock *pCondition1 = NULL;
+//    BasicBlock *pCondition2 = NULL;
+//    BasicBlock *pElseBody = NULL;
+//    LoadInst *pLoad1 = NULL;
+//    LoadInst *pLoad2 = NULL;
+//    ICmpInst *pCmp = NULL;
+//
+//    BinaryOperator *pBinary = NULL;
+//    TerminatorInst *pTerminator = NULL;
+//    BranchInst *pBranch = NULL;
+//    StoreInst *pStore = NULL;
+//    CallInst *pCall = NULL;
+//    AttributeList emptyList;
+//
+//    Function *pInnerFunction = pInnerLoop->getHeader()->getParent();
+//    Module *pModule = pInnerFunction->getParent();
+//
+//    pCondition1 = pInnerLoop->getLoopPreheader();
+//    BasicBlock *pHeader = pInnerLoop->getHeader();
+//
+//    pCondition2 = BasicBlock::Create(pModule->getContext(), ".if2.aprof", pInnerFunction, 0);
+//    BasicBlock *label_if_then = BasicBlock::Create(pModule->getContext(), "if.then", pInnerFunction, 0);
+//    BasicBlock *label_if_then3 = BasicBlock::Create(pModule->getContext(), "if.then3", pInnerFunction, 0);
+//    BasicBlock *label_if_end = BasicBlock::Create(pModule->getContext(), "if.end", pInnerFunction, 0);
+//    BasicBlock *label_if_then5 = BasicBlock::Create(pModule->getContext(), "if.then5", pInnerFunction, 0);
+//    pElseBody = BasicBlock::Create(pModule->getContext(), ".else.body.aprof", pInnerFunction, 0);
+//
+//    pTerminator = pCondition1->getTerminator();
+//
+//    if (!this->bGivenOuterLoop) {
+//        assert(false);
+//    }
+//
+//    pLoad1 = new LoadInst(this->SampleMonitor, "", false, pTerminator);
+//    pLoad1->setAlignment(4);
+//    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_SLT, pLoad1, this->ConstantInt2, "cmp0");
+//    pBranch = BranchInst::Create(label_if_then, pCondition2, pCmp);
+//    ReplaceInstWithInst(pTerminator, pBranch);
+//
+//    //condition2
+//    pLoad2 = new LoadInst(this->Switcher, "", false, 4, pCondition2);
+//    pCmp = new ICmpInst(*pCondition2, ICmpInst::ICMP_EQ, pLoad2, this->ConstantInt0, "cmp1");
+//    BranchInst::Create(label_if_then, pHeader, pCmp, pCondition2);
+//
+//    // Block if.then (label_if_then)
+//    pLoad1 = new LoadInst(this->SampleMonitor, "", false, 4, label_if_then);
+//    pBinary = BinaryOperator::Create(Instruction::Sub, pLoad1,
+//                                     this->ConstantInt1, "dec", label_if_then);
+//    new StoreInst(pBinary, this->SampleMonitor, false, 4, label_if_then);
+//
+//    pLoad1 = new LoadInst(this->SampleMonitor, "", false, 4, label_if_then);
+//    pCmp = new ICmpInst(*label_if_then, ICmpInst::ICMP_EQ, pLoad1, this->ConstantInt0, "cmp2");
+//    BranchInst::Create(label_if_then3, label_if_end, pCmp, label_if_then);
+//
+//    // Block if.then3 (label_if_then3)
+//    pStore = new StoreInst(this->ConstantInt2, this->SampleMonitor, false, 4, label_if_then3);
+//    BranchInst::Create(label_if_end, label_if_then3);
+//
+//    // Block if.end (label_if_end)
+//    LoadInst *int32_35 = new LoadInst(this->Switcher, "", false, 4, label_if_end);
+//    ICmpInst *int1_cmp4 = new ICmpInst(*label_if_end, ICmpInst::ICMP_EQ, int32_35, this->ConstantInt0, "cmp3");
+//    BranchInst::Create(label_if_then5, pElseBody, int1_cmp4, label_if_end);
+//
+//    // Block if.then5 (label_if_then5)
+//    pLoad1 = new LoadInst(this->GeoRate, "", false, label_if_then5);
+//    pLoad1->setAlignment(4);
+//    pCall = CallInst::Create(this->aprof_geo, pLoad1, "", label_if_then5);
+//    pCall->setCallingConv(CallingConv::C);
+//    pCall->setTailCall(false);
+//    pCall->setAttributes(emptyList);
+//    new StoreInst(pCall, this->Switcher, false, 4, label_if_then5);
+//    BranchInst::Create(pElseBody, label_if_then5);
+//
+//
+//    vecAdded.push_back(pCondition1);
+//    vecAdded.push_back(pCondition2);
+//    vecAdded.push_back(label_if_then);
+//    vecAdded.push_back(label_if_then3);
+//    vecAdded.push_back(label_if_end);
+//    vecAdded.push_back(label_if_then5);
+//    // num 6
+//    vecAdded.push_back(pElseBody);
+//
+//}
+
 void LoopInterestedHook::CreateIfElseIfBlock(Loop *pInnerLoop, vector<BasicBlock *> &vecAdded) {
     BasicBlock *pCondition1 = NULL;
-    BasicBlock *pCondition2 = NULL;
-
     BasicBlock *pElseBody = NULL;
-
+    BranchInst *pBranch = NULL;
     LoadInst *pLoad1 = NULL;
     LoadInst *pLoad2 = NULL;
     ICmpInst *pCmp = NULL;
 
-    BinaryOperator *pBinary = NULL;
     TerminatorInst *pTerminator = NULL;
-    BranchInst *pBranch = NULL;
-    StoreInst *pStore = NULL;
     CallInst *pCall = NULL;
     AttributeList emptyList;
 
@@ -586,11 +665,7 @@ void LoopInterestedHook::CreateIfElseIfBlock(Loop *pInnerLoop, vector<BasicBlock
     pCondition1 = pInnerLoop->getLoopPreheader();
     BasicBlock *pHeader = pInnerLoop->getHeader();
 
-    pCondition2 = BasicBlock::Create(pModule->getContext(), ".if2.aprof", pInnerFunction, 0);
-    BasicBlock *label_if_then = BasicBlock::Create(pModule->getContext(), "if.then", pInnerFunction, 0);
-    BasicBlock *label_if_then3 = BasicBlock::Create(pModule->getContext(), "if.then3", pInnerFunction, 0);
-    BasicBlock *label_if_end = BasicBlock::Create(pModule->getContext(), "if.end", pInnerFunction, 0);
-    BasicBlock *label_if_then5 = BasicBlock::Create(pModule->getContext(), "if.then5", pInnerFunction, 0);
+    BasicBlock *label_geo = BasicBlock::Create(pModule->getContext(), "label.geo", pInnerFunction, 0);
     pElseBody = BasicBlock::Create(pModule->getContext(), ".else.body.aprof", pInnerFunction, 0);
 
     pTerminator = pCondition1->getTerminator();
@@ -599,54 +674,24 @@ void LoopInterestedHook::CreateIfElseIfBlock(Loop *pInnerLoop, vector<BasicBlock
         assert(false);
     }
 
-    pLoad1 = new LoadInst(this->SampleMonitor, "", false, pTerminator);
-    pLoad1->setAlignment(4);
-    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_SLT, pLoad1, this->ConstantInt2, "cmp0");
-    pBranch = BranchInst::Create(label_if_then, pCondition2, pCmp);
+    //condition2
+    pLoad2 = new LoadInst(this->Switcher, "", false, 4, pTerminator);
+    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_EQ, pLoad2, this->ConstantInt0, "cmp1");
+    pBranch = BranchInst::Create(label_geo, pHeader, pCmp);
     ReplaceInstWithInst(pTerminator, pBranch);
 
-    //condition2
-    pLoad2 = new LoadInst(this->Switcher, "", false, 4, pCondition2);
-    pCmp = new ICmpInst(*pCondition2, ICmpInst::ICMP_EQ, pLoad2, this->ConstantInt0, "cmp1");
-    BranchInst::Create(label_if_then, pHeader, pCmp, pCondition2);
-
-    // Block if.then (label_if_then)
-    pLoad1 = new LoadInst(this->SampleMonitor, "", false, 4, label_if_then);
-    pBinary = BinaryOperator::Create(Instruction::Sub, pLoad1,
-                                     this->ConstantInt1, "dec", label_if_then);
-    new StoreInst(pBinary, this->SampleMonitor, false, 4, label_if_then);
-
-    pLoad1 = new LoadInst(this->SampleMonitor, "", false, 4, label_if_then);
-    pCmp = new ICmpInst(*label_if_then, ICmpInst::ICMP_EQ, pLoad1, this->ConstantInt0, "cmp2");
-    BranchInst::Create(label_if_then3, label_if_end, pCmp, label_if_then);
-
-    // Block if.then3 (label_if_then3)
-    pStore = new StoreInst(this->ConstantInt2, this->SampleMonitor, false, 4, label_if_then3);
-    BranchInst::Create(label_if_end, label_if_then3);
-
-    // Block if.end (label_if_end)
-    LoadInst *int32_35 = new LoadInst(this->Switcher, "", false, 4, label_if_end);
-    ICmpInst *int1_cmp4 = new ICmpInst(*label_if_end, ICmpInst::ICMP_EQ, int32_35, this->ConstantInt0, "cmp3");
-    BranchInst::Create(label_if_then5, pElseBody, int1_cmp4, label_if_end);
-
     // Block if.then5 (label_if_then5)
-    pLoad1 = new LoadInst(this->GeoRate, "", false, label_if_then5);
-    pLoad1->setAlignment(4);
-    pCall = CallInst::Create(this->aprof_geo, pLoad1, "", label_if_then5);
+    pLoad1 = new LoadInst(this->GeoRate, "", false, 4, label_geo);
+    pCall = CallInst::Create(this->aprof_geo, pLoad1, "", label_geo);
     pCall->setCallingConv(CallingConv::C);
     pCall->setTailCall(false);
     pCall->setAttributes(emptyList);
-    new StoreInst(pCall, this->Switcher, false, 4, label_if_then5);
-    BranchInst::Create(pElseBody, label_if_then5);
-
+    new StoreInst(pCall, this->Switcher, false, 4, label_geo);
+    BranchInst::Create(pElseBody, label_geo);
 
     vecAdded.push_back(pCondition1);
-    vecAdded.push_back(pCondition2);
-    vecAdded.push_back(label_if_then);
-    vecAdded.push_back(label_if_then3);
-    vecAdded.push_back(label_if_end);
-    vecAdded.push_back(label_if_then5);
-    // num 6
+    vecAdded.push_back(label_geo);
+    // num 2
     vecAdded.push_back(pElseBody);
 
 }
@@ -779,6 +824,8 @@ bool LoopInterestedHook::runOnModule(Module &M) {
             return false;
         }
 
+//        pOuterFunction->dump();
+
         LoopInfo *pOuterLI = &getAnalysis<LoopInfoWrapperPass>(*pOuterFunction).getLoopInfo();
         this->pOuterLoop = SearchLoopByLineNo(pOuterFunction, pOuterLI, uOuterSrcLine);
 
@@ -851,6 +898,7 @@ bool LoopInterestedHook::runOnModule(Module &M) {
 
         Instruction *firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
         InstrumentInit(firstInst);
+        AddHooksToOuterFunction(MainFunc);
     }
 
     return true;

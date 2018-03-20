@@ -164,7 +164,7 @@ void AprofHook::SetupFunctions() {
     if (!this->aprof_call_before) {
         ArgTypes.push_back(this->IntType);
         //ArgTypes.push_back(this->LongType);
-        FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidPointerType, ArgTypes, false);
+        FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_call_before = Function::Create(AprofCallBeforeType, GlobalValue::ExternalLinkage,
                                                    "aprof_call_before", this->pModule);
         this->aprof_call_before->setCallingConv(CallingConv::C);
@@ -183,6 +183,19 @@ void AprofHook::SetupFunctions() {
         this->aprof_return = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_return",
                                               this->pModule);
         this->aprof_return->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
+
+    // aprof_final
+    this->aprof_final = this->pModule->getFunction("aprof_final");
+//    assert(this->aprof_return != NULL);
+
+    if (!this->aprof_final) {
+        //ArgTypes.push_back(this->LongType);
+        FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_final = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_final",
+                                             this->pModule);
+        this->aprof_final->setCallingConv(CallingConv::C);
         ArgTypes.clear();
     }
 
@@ -406,6 +419,18 @@ void AprofHook::InstrumentRmsUpdater(Function *F, Instruction *BeforeInst) {
 
     }
 
+    if (funcName == "fread") {
+
+        vecParams.push_back(this->ConstantLong1);
+        CallInst *void_49 = CallInst::Create(this->aprof_increment_rms,
+                                             vecParams, "", BeforeInst);
+        void_49->setCallingConv(CallingConv::C);
+        void_49->setTailCall(false);
+        AttributeList void_PAL;
+        void_49->setAttributes(void_PAL);
+
+    }
+
 }
 
 bool isI8PointerType(Value *val) {
@@ -581,6 +606,31 @@ void AprofHook::InstrumentReturn(Instruction *BeforeInst) {
     void_49->setAttributes(void_PAL);
 }
 
+void AprofHook::InstrumentFinal(Function *mainFunc) {
+
+    for (Function::iterator BI = mainFunc->begin(); BI != mainFunc->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            switch (Inst->getOpcode()) {
+                case Instruction::Ret: {
+                    std::vector<Value *> vecParams;
+                    CallInst *void_49 = CallInst::Create(this->aprof_final, vecParams, "", Inst);
+                    void_49->setCallingConv(CallingConv::C);
+                    void_49->setTailCall(false);
+                    AttributeList void_PAL;
+                    void_49->setAttributes(void_PAL);
+                }
+            }
+        }
+    }
+
+}
+
 void AprofHook::InstrumentHooks(Function *Func, bool isOptimized) {
 
     int FuncID = GetFunctionID(Func);
@@ -591,8 +641,6 @@ void AprofHook::InstrumentHooks(Function *Func, bool isOptimized) {
     }
 
     assert(FuncID > 0);
-
-
 
     // be carefull, there must be this order!
     InstrumentCostUpdater(Func, isOptimized);
@@ -753,9 +801,9 @@ void AprofHook::SetupHooks() {
 
         Function *Func = &*FI;
 
-        if (hasUnifiedUnreachableBlock(Func)) {
-            continue ;
-        }
+//        if (hasUnifiedUnreachableBlock(Func)) {
+//            continue ;
+//        }
 
         if (isSampling == 1) {
 
@@ -794,17 +842,9 @@ void AprofHook::SetupHooks() {
         //Instruction *firstInst = &*(MainFunc->begin()->begin());
         Instruction *firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
         InstrumentInit(firstInst);
+        InstrumentFinal(MainFunc);
     }
 
-//    Function *mysql_parse = this->pModule->getFunction("_Z11mysql_parseP3THDPcj");
-//    assert(mysql_parse != NULL);
-//
-//    if (mysql_parse) {
-//
-//        //Instruction *firstInst = &*(MainFunc->begin()->begin());
-//        Instruction *firstInst = mysql_parse->getEntryBlock().getFirstNonPHI();
-//        InstrumentInit(firstInst);
-//    }
 }
 
 bool AprofHook::runOnModule(Module &M) {

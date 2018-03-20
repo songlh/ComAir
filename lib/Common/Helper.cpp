@@ -336,13 +336,28 @@ bool IsRecursiveCall(Function *F) {
 }
 
 
+std::string getFileNameForInstruction(Instruction *pInst) {
+    const DILocation *DIL = pInst->getDebugLoc();
+
+    if (!DIL)
+        return "";
+
+    char pPath[400];
+
+    std::string sFileName = DIL->getDirectory().str() + "/" + DIL->getFilename().str();
+    realpath(sFileName.c_str(), pPath);
+    sFileName = std::string(sFileName);
+    return sFileName;
+
+}
+
 std::string printSrcCodeInfo(Instruction *pInst) {
     const DILocation *DIL = pInst->getDebugLoc();
 
     if (!DIL)
         return "";
 
-    char pPath[200];
+    char pPath[400];
 
     std::string sFileName = DIL->getDirectory().str() + "/" + DIL->getFilename().str();
     realpath(sFileName.c_str(), pPath);

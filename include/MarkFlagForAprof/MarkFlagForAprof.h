@@ -8,6 +8,7 @@
 
 
 using namespace llvm;
+using namespace std;
 
 struct MarkFlagForAprof : public ModulePass {
     static char ID;
@@ -26,6 +27,8 @@ struct MarkFlagForAprof : public ModulePass {
 
     void MarkBBUpdateFlag(Function *);
     void MarkInstFlag(Instruction *);
+
+    void collectSkipStackRW(Function *F, std::set<Instruction *> &setSkip);
 
     void OptimizeReadWrite(Function *F);
     void NotOptimizeReadWrite(Function *F);

@@ -53,7 +53,6 @@ int calculateBB(Function *pFunc) {
     return count;
 }
 
-
 bool containCallInstAfter(Instruction *I) {
     BasicBlock *B = I->getParent();
     BasicBlock::iterator II = B->begin();
@@ -72,7 +71,6 @@ bool containCallInstAfter(Instruction *I) {
 
     return false;
 }
-
 
 bool containCallInstBefore(Instruction *I) {
     BasicBlock *B = I->getParent();
@@ -125,7 +123,6 @@ bool containCallInstBetween(Instruction *I1, Instruction *I2) {
 
     return false;
 }
-
 
 bool isSucc(BasicBlock *B1, BasicBlock *B2) {
     for (succ_iterator succ = succ_begin(B1); succ != succ_end(B1); succ++) {
@@ -297,7 +294,6 @@ bool StackRWProfiling::runOnFunction(Function *F) {
 
     return false;
 }
-
 
 bool StackRWProfiling::runOnModule(Module &M) {
     bool changed = false;

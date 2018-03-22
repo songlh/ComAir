@@ -411,9 +411,39 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
                         if (GetElementPtrInst *pGet = dyn_cast<GetElementPtrInst>(pLoad->getPointerOperand())) {
                             if (ConstantInt *CI = dyn_cast<ConstantInt>(pGet->getOperand(1))) {
                                 if (CI->isZero()) {
-                                    if (LoadInst *pLoad = dyn_cast<LoadInst>(pGet->getPointerOperand())) {
-                                        if (pLoad->getPointerOperand() == *itSetBegin) {
+                                    if (LoadInst *pLoad1 = dyn_cast<LoadInst>(pGet->getPointerOperand())) {
+                                        if (pLoad1->getPointerOperand() == *itSetBegin) {
                                             setStoreBlocks.insert(pStore->getParent());
+                                        }
+                                    }
+                                }
+                            }
+                        } else if (AllocaInst *pAlloc = dyn_cast<AllocaInst>(pLoad->getPointerOperand())) {
+                            for (User *U2 : pAlloc->users()) {
+                                if (StoreInst *pStore1 = dyn_cast<StoreInst>(U2)) {
+                                    if (setLoopBlocks.find(pStore1->getParent()) == setLoopBlocks.end()) {
+                                        continue;
+                                    }
+
+                                    if (LoadInst *pLoad1 = dyn_cast<LoadInst>(pStore1->getValueOperand())) {
+                                        if (setLoopBlocks.find(pLoad1->getParent()) == setLoopBlocks.end()) {
+                                            continue;
+                                        }
+
+                                        //pLoad1->dump();
+
+                                        if (GetElementPtrInst *pGet = dyn_cast<GetElementPtrInst>(
+                                                pLoad1->getPointerOperand())) {
+                                            if (ConstantInt *CI = dyn_cast<ConstantInt>(pGet->getOperand(1))) {
+                                                if (CI->isZero()) {
+                                                    if (LoadInst *pLoad2 = dyn_cast<LoadInst>(
+                                                            pGet->getPointerOperand())) {
+                                                        if (pLoad2->getPointerOperand() == *itSetBegin) {
+                                                            setStoreBlocks.insert(pStore->getParent());
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }

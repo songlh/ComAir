@@ -34,13 +34,12 @@ void aprof_init_page_table();
 
 unsigned long aprof_query_page_table(unsigned long address);
 
-void aprof_insert_page_table(unsigned long start_addr,
-                             unsigned long length, unsigned long count);
+void aprof_insert_page_table(unsigned long start_addr, unsigned long count);
 
 /*---- end ----*/
 
 /*---- share memory ---- */
-#define BUFFERSIZE (unsigned long) 1 << 33
+#define BUFFERSIZE (unsigned long) 1UL << 34
 #define APROF_MEM_LOG "/aprof_log.log"
 
 char * aprof_init_share_mem();

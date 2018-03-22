@@ -5,6 +5,7 @@
 #include "llvm/Analysis/PostDominators.h"
 #include "llvm/IR/CallSite.h"
 #include "llvm/IR/MDBuilder.h"
+#include "llvm/Transforms/Utils/PromoteMemToReg.h"
 
 #include "Common/Constant.h"
 #include "Common/Helper.h"
@@ -31,82 +32,167 @@ static cl::opt<int> isSampling("is-sampling",
 
 /* local functions */
 
-bool IsInBasicBlock(int bb_id,
-                    std::map<int, std::set<Value *>> VisitedValues,
-                    Value *var) {
+bool containCallInst(BasicBlock *BB) {
+    for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+        Instruction *I = &*II;
 
-    if (VisitedValues.find(bb_id) != VisitedValues.end()) {
-        std::set<Value *> temp_str_set = VisitedValues[bb_id];
-        if (temp_str_set.find(var) != temp_str_set.end()) {
+        if (isa<CallInst>(I)) {
             return true;
         }
     }
 
     return false;
-
 }
 
-std::map<int, std::set<Value *>> UpdateVisitedMap(
-        std::map<int, std::set<Value *>> VisitedValues,
-        int bb_id, Value *var) {
+int calculateBB(Function *pFunc) {
+    int count = 0;
 
-    if (VisitedValues.find(bb_id) != VisitedValues.end()) {
-        std::set<Value *> temp_str_set = VisitedValues[bb_id];
-        if (temp_str_set.find(var) == temp_str_set.end()) {
-            temp_str_set.insert(var);
-            VisitedValues[bb_id] = temp_str_set;
-        }
-    } else {
-        std::set<Value *> str_set;
-        str_set.insert(var);
-        VisitedValues[bb_id] = str_set;
+    for (Function::iterator BI = pFunc->begin(); BI != pFunc->end(); BI++) {
+        count++;
     }
 
-    return VisitedValues;
+    return count;
+}
 
-};
+bool containCallInstAfter(Instruction *I) {
+    BasicBlock *B = I->getParent();
+    BasicBlock::iterator II = B->begin();
 
-std::map<int, std::set<Value *>> UpdatePreVisitedToCur(
-        std::map<int, std::set<Value *>> VisitedValues,
-        int pre_bb_id, int bb_id) {
-
-    if (VisitedValues.find(pre_bb_id) != VisitedValues.end()) {
-
-        std::set<Value *> temp_str_set = VisitedValues[pre_bb_id];
-
-        if (VisitedValues.find(bb_id) == VisitedValues.end()) {
-
-            VisitedValues[bb_id] = temp_str_set;
-
-        } else {
-
-            std::set<Value *> temp_bb_str_set = VisitedValues[bb_id];
-            temp_bb_str_set.insert(temp_str_set.begin(), temp_str_set.end());
+    for (; II != B->end(); II++) {
+        if (I == &*II) {
+            break;
         }
     }
 
-    return VisitedValues;
-};
-
-bool isSuccAllSinglePredecessor(BasicBlock *BB) {
-
-    // mat be BB is the last basic block!
-    TerminatorInst *terInst = BB->getTerminator();
-    if (terInst->getNumSuccessors() == 0) {
-        return false;
-    }
-
-    for (succ_iterator si = succ_begin(BB); si != succ_end(BB); si++) {
-
-        BasicBlock *sucBB = *si;
-
-        if (!sucBB->getSinglePredecessor()) {
-            return false;
+    for (; II != B->end(); II++) {
+        if (isa<CallInst>(&*II)) {
+            return true;
         }
     }
 
-    return true;
+    return false;
+}
 
+bool containCallInstBefore(Instruction *I) {
+    BasicBlock *B = I->getParent();
+
+    for (BasicBlock::iterator II = B->begin(); II != B->end(); II++) {
+        if (I == &*II) {
+            break;
+        }
+
+        if (isa<CallInst>(&*II)) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+unsigned getInstIndex(Instruction *I) {
+    BasicBlock *B = I->getParent();
+    unsigned index = 0;
+
+    for (BasicBlock::iterator II = B->begin(); II != B->end(); II++) {
+        if (I == &*II) {
+            return index;
+        }
+
+        index++;
+    }
+
+    assert(false);
+}
+
+bool containCallInstBetween(Instruction *I1, Instruction *I2) {
+    assert(I1->getParent() == I2->getParent());
+    assert(getInstIndex(I1) < getInstIndex(I2));
+    BasicBlock *B = I1->getParent();
+
+    bool first = false;
+
+    for (BasicBlock::iterator II = B->begin(); II != B->end(); II++) {
+        if (I1 == &*II) {
+            first = true;
+        } else if (I2 == &*II) {
+            break;
+        } else if (first && isa<CallInst>(&*II)) {
+            return true;
+        }
+
+    }
+
+    return false;
+}
+
+bool isSucc(BasicBlock *B1, BasicBlock *B2) {
+    for (succ_iterator succ = succ_begin(B1); succ != succ_end(B1); succ++) {
+        if (B2 == *succ) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+void computeReachabilityInfo(Function *F, map<BasicBlock *, map<BasicBlock *, int> > &ReachInfo) {
+    ReachInfo.clear();
+
+    for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+
+        BasicBlock *B = &*BI;
+        map<BasicBlock *, int> mapTmp;
+        ReachInfo[B] = mapTmp;
+
+        for (Function::iterator BBI = F->begin(); BBI != F->end(); BBI++) {
+            BasicBlock *BB = &*BBI;
+            //ReachInfo[BB][BBB] = 0;
+            if (B == BB) {
+                ReachInfo[B][BB] = 1;
+            } else {
+                ReachInfo[B][BB] = 0;
+            }
+        }
+    }
+
+    for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+        BasicBlock *B = &*BI;
+
+        for (succ_iterator succ = succ_begin(&*BI); succ != succ_end(&*BI); succ++) {
+            BasicBlock *succB = *succ;
+            ReachInfo[B][succB] = 1;
+        }
+    }
+
+    while (true) {
+        bool flag = true;
+
+        for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+            BasicBlock *B = &*BI;
+
+            for (Function::iterator BBI = F->begin(); BBI != F->end(); BBI++) {
+                BasicBlock *BB = &*BBI;
+
+                if (ReachInfo[B][BB] == 1) {
+                    continue;
+                }
+
+                for (Function::iterator BBBI = F->begin(); BBBI != F->end(); BBBI++) {
+                    BasicBlock *BBB = &*BBBI;
+
+                    if (ReachInfo[B][BBB] == 1 && ReachInfo[BBB][BB] == 1) {
+                        flag = false;
+                        ReachInfo[B][BB] = 1;
+                    }
+
+                }
+            }
+        }
+
+        if (flag) {
+            break;
+        }
+    }
 }
 
 /* end local functions */
@@ -115,11 +201,14 @@ char MarkFlagForAprof::ID = 0;
 
 void MarkFlagForAprof::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.addRequired<PostDominatorTreeWrapperPass>();
+    AU.addRequired<DominatorTreeWrapperPass>();
 
 }
 
 MarkFlagForAprof::MarkFlagForAprof() : ModulePass(ID) {
+    PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializePostDominatorTreeWrapperPassPass(*PassRegistry::getPassRegistry());
+    initializeDominatorTreeWrapperPassPass(Registry);
 }
 
 void MarkFlagForAprof::setupTypes() {
@@ -171,139 +260,89 @@ void MarkFlagForAprof::MarkIgnoreOptimizedFlag(Function *F) {
     }
 }
 
-void MarkFlagForAprof::MarkFlag(BasicBlock *BB, int Num) {
+void MarkFlagForAprof::collectSkipStackRW(Function *F, set<Instruction *> &setSkip) {
+    BasicBlock *BB = &F->getEntryBlock();
+    vector<AllocaInst *> Allocas;
 
-    MDBuilder MDHelper(this->pModule->getContext());
-
-    Instruction *Inst = &*(BB->getFirstInsertionPt());
-
-    if (Inst) {
-
-        Constant *InsID = ConstantInt::get(this->IntType, Num);
-        SmallVector<Metadata *, 1> Vals;
-        Vals.push_back(MDHelper.createConstant(InsID));
-        Inst->setMetadata(BB_COST_FLAG, MDNode::get(
-                this->pModule->getContext(), Vals));
-
-    } else {
-
-        errs() << "Current Basic Block could not find an"
-                " instruction to mark bb cost flag." << "\n";
-    }
-
-}
-
-void MarkFlagForAprof::MarkBBUpdateFlag(Function *F) {
-
-    std::stack<BasicBlock *> VisitedStack;
-    std::map<BasicBlock *, int> MarkedMap;
-    std::set<BasicBlock *> VisitedSet;
-
-    BasicBlock *firstBB = &*(F->begin());
-
-    if (firstBB) {
-        VisitedStack.push(firstBB);
-        MarkedMap[firstBB] = 1;
-    }
-
-    while (!VisitedStack.empty()) {
-
-        BasicBlock *topBB = VisitedStack.top();
-        VisitedStack.pop();
-
-        if (VisitedSet.find(topBB) == VisitedSet.end())
-            VisitedSet.insert(topBB);
-        else
-            continue;
-
-        // last bb
-        TerminatorInst *terInst = topBB->getTerminator();
-        if (terInst->getNumSuccessors() == 0) {
-            continue;
-        }
-
-        int _count = 1;
-
-        if (isSuccAllSinglePredecessor(topBB)) {
-
-            _count = MarkedMap[topBB] + 1;
-            MarkedMap.erase(topBB);
-        }
-
-        for (succ_iterator si = succ_begin(topBB); si != succ_end(topBB); si++) {
-
-            if (VisitedSet.find(*si) != VisitedSet.end())
-                continue;
-
-            VisitedStack.push(*si);
-            MarkedMap[*si] = _count;
-        }
-    }
-
-    std::map<BasicBlock *, int>::iterator
-            itMapBegin = MarkedMap.begin();
-    std::map<BasicBlock *, int>::iterator
-            itMapEnd = MarkedMap.end();
-
-    while (itMapBegin != itMapEnd) {
-
-        auto *itBB = itMapBegin->first;
-
-        if (!itBB->getSinglePredecessor()) {
-
-            std::set<BasicBlock *> preSet;
-            int preCount = 0;
-            bool flag = true;
-
-            for (auto it = pred_begin(itBB), et = pred_end(itBB); it != et; ++it) {
-
-                if (MarkedMap.find(*it) == MarkedMap.end()) {
-                    flag = false;
-                    break;
-                }
-
-                if (preCount == 0) {
-                    preCount = MarkedMap[*it];
-
-                } else if (preCount != MarkedMap[*it]) {
-                    flag = false;
-                    break;
-
-                }
-
-                preSet.insert(*it);
-
-            }
-
-            if (flag) {
-
-                // erase preSet and update itBB's count
-                for (auto it: preSet) {
-                    MarkedMap.erase(it);
-                }
-
-                MarkedMap[itBB] = preCount + 1;
+    for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+        if (AllocaInst *AI = dyn_cast<AllocaInst>(II)) {
+            if (isAllocaPromotable(AI)) {
+                Allocas.push_back(AI);
             }
         }
-
-        itMapBegin++;
     }
 
-
-    itMapBegin = MarkedMap.begin();
-    itMapEnd = MarkedMap.end();
-
-    while (itMapBegin != itMapEnd) {
-        MarkFlag(itMapBegin->first, itMapBegin->second);
-        itMapBegin++;
-
+    if (Allocas.size() == 0) {
+        return;
     }
 
+    map<BasicBlock *, map<BasicBlock *, int> > ReachInfo;
+    computeReachabilityInfo(F, ReachInfo);
+
+    DominatorTree *DT = &getAnalysis<DominatorTreeWrapperPass>(*F).getDomTree();
+
+    for (vector<AllocaInst *>::iterator itBegin = Allocas.begin(); itBegin != Allocas.end(); itBegin++) {
+        AllocaInst *pAlloc = *itBegin;
+
+        for (User *U1 : pAlloc->users()) {
+
+            if (Instruction *I1 = dyn_cast<Instruction>(U1)) {
+                if (isa<LoadInst>(I1) || isa<StoreInst>(I1)) {
+
+                    for (User *U2: pAlloc->users()) {
+                        if (U1 == U2) {
+                            continue;
+                        }
+
+                        if (Instruction *I2 = dyn_cast<Instruction>(U2)) {
+                            if (isa<LoadInst>(I2) || isa<StoreInst>(I2)) {
+                                if (DT->dominates(I1->getParent(), I2->getParent())) {
+                                    if (I2->getParent() == I1->getParent()) {
+                                        if (getInstIndex(I2) > getInstIndex(I1)) {
+                                            if (!containCallInstBetween(I1, I2)) {
+                                                setSkip.insert(I2);
+//                                                errs() << "1---I1" << *I1 << "; I2" << *I2 << "\n";
+                                                break;
+                                            }
+                                        }
+                                    } else if (isSucc(I1->getParent(), I2->getParent())) {
+                                        if (!containCallInstAfter(I1) && !containCallInstBefore(I2)) {
+                                            setSkip.insert(I2);
+//                                            errs() << "2---I1" << *I1 << "; I2" << *I2 << "\n";
+                                            break;
+                                        }
+                                    } else {
+                                        bool flag = true;
+
+                                        for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+                                            BasicBlock *BB = &*BI;
+
+                                            if (ReachInfo[I1->getParent()][BB] == 1 &&
+                                                ReachInfo[BB][I2->getParent()] == 1) {
+                                                if (containCallInst(BB)) {
+                                                    flag = false;
+                                                    break;
+                                                }
+                                            }
+                                        }
+
+                                        if (flag) {
+                                            setSkip.insert(I2);
+//                                            errs() << "3---I1" << *I1 << "; I2" << *I2 << "\n";
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 void MarkFlagForAprof::OptimizeReadWrite(Function *Func) {
-
-    std::map<int, std::set<Value *>> VisitedValues;
 
     if (isSampling == 1) {
 
@@ -316,76 +355,34 @@ void MarkFlagForAprof::OptimizeReadWrite(Function *Func) {
         return;
     }
 
-    VisitedValues.clear();
+    set<Instruction *> setSkip;
+    collectSkipStackRW(Func, setSkip);
 
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
-        BasicBlock *BB = &*BI;
-
-        int bb_id = GetBasicBlockID(BB);
-
-        BasicBlock *Pre_BB = BB->getSinglePredecessor();
-
-        if (Pre_BB) {
-            // if current bb has only one pre bb, we can update this's pre's values.
-            int pre_bb_id = GetBasicBlockID(Pre_BB);
-            VisitedValues = UpdatePreVisitedToCur(VisitedValues, pre_bb_id, bb_id);
-        }
-
-        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+        for (BasicBlock::iterator II = BI->begin(); II != BI->end(); II++) {
 
             Instruction *Inst = &*II;
 
+            if (GetInstructionID(Inst) <= 0) {
+                continue;
+            }
+
             switch (Inst->getOpcode()) {
-
-//                    case Instruction::Alloca: {
-//                        if (!IsInBasicBlock(bb_id, VisitedValues, Inst)) {
-//                            MarkFlag(Inst, READ);
-//                        }
-//                        VisitedValues = UpdateVisitedMap(
-//                                VisitedValues, bb_id, Inst);
-//                        break;
-//                    }
-
-                case Instruction::Call: {
-                    // clear current VisitedValues.second
-                    CallSite ci(Inst);
-                    Function *Callee = dyn_cast<Function>(
-                            ci.getCalledValue()->stripPointerCasts());
-
-                    if (!IsIgnoreFunc(Callee)) {
-                        if (VisitedValues.find(bb_id) != VisitedValues.end()) {
-                            std::set<Value *> null_set;
-                            null_set.clear();
-                            VisitedValues[bb_id] = null_set;
-                        }
-                    }
-                    break;
-                }
-
                 case Instruction::Load: {
-                    Value *firstOp = Inst->getOperand(0);
-                    if (!IsInBasicBlock(bb_id, VisitedValues, firstOp)) {
+                    if (setSkip.find(Inst) == setSkip.end()) {
                         MarkFlag(Inst, READ);
                     }
-                    VisitedValues = UpdateVisitedMap(
-                            VisitedValues, bb_id, firstOp);
+
                     break;
                 }
-
                 case Instruction::Store: {
-//                        Value *firstOp = Inst->getOperand(0);
-//                        firstOp->dump();
-
-                    Value *secondOp = Inst->getOperand(1);
-                    if (!IsInBasicBlock(bb_id, VisitedValues, secondOp)) {
+                    if (setSkip.find(Inst) == setSkip.end()) {
                         MarkFlag(Inst, WRITE);
                     }
-                    VisitedValues = UpdateVisitedMap(
-                            VisitedValues, bb_id, secondOp);
+
                     break;
                 }
-
             }
         }
     }
@@ -411,10 +408,6 @@ void MarkFlagForAprof::NotOptimizeReadWrite(Function *Func) {
             Instruction *Inst = &*II;
 
             switch (Inst->getOpcode()) {
-//                case Instruction::Alloca: {
-//                    MarkFlag(Inst, READ);
-//                    break;
-//                }
                 case Instruction::Load: {
                     MarkFlag(Inst, READ);
                     break;
@@ -435,6 +428,10 @@ bool MarkFlagForAprof::runOnModule(Module &M) {
     for (Module::iterator FI = pModule->begin(); FI != pModule->end(); FI++) {
         Function *Func = &*FI;
         MarkIgnoreOptimizedFlag(Func);
+
+//        if (Func->getName() != "max") {
+//            continue;
+//        }
 
         if (notOptimizing == 1 || getIgnoreOptimizedFlag(Func)) {
             NotOptimizeReadWrite(Func);

@@ -6,9 +6,10 @@ struct log_address store_stack[1];
 
 // share memory
 int fd;
-void *pcBuffer=NULL;
+void *pcBuffer = NULL;
 unsigned int store_size = sizeof(struct log_address);
-int last_sample = 0;
+
+int record_log = 0;
 
 // sampling
 static int old_value = -1;
@@ -30,56 +31,43 @@ void aprof_init() {
 
 }
 
-
-void aprof_write(void *memory_addr, unsigned long length) {
-    store_stack[0].flag = 'w';
-    store_stack[0].start_addr = (unsigned long) memory_addr;
-    store_stack[0].length = length;
-    memcpy(pcBuffer, &(store_stack), store_size);
-    pcBuffer += store_size;
-}
-
-
 void aprof_read(void *memory_addr, unsigned long length) {
-    unsigned long star_addr = (unsigned long) memory_addr;
-//    if (star_addr != store_stack[0].start_addr || store_stack[0].length != length) {
+    unsigned long start_addr = (unsigned long) memory_addr;
+    if (record_log == 0) {
+        if (store_stack[0].start_addr != start_addr || store_stack[0].length != length) {
+            store_stack[0].flag = 'r';
+            store_stack[0].start_addr = start_addr;
+            store_stack[0].length = length;
+            memcpy(pcBuffer, &(store_stack), store_size);
+            pcBuffer += store_size;
+        }
+
+    } else {
+
         store_stack[0].flag = 'r';
-        store_stack[0].start_addr = (unsigned long) memory_addr;
+        store_stack[0].start_addr = start_addr;
         store_stack[0].length = length;
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
-//    }
+        record_log = 0;
+    }
 
 }
 
 
 void aprof_return(unsigned long numCost, int sample) {
-    if (sample == 3) {
-        // this is for last one to record last num cost!
-        store_stack[0].flag = 'o';
-        store_stack[0].start_addr = sample;
-        // carefull !!!
-        store_stack[0].length = numCost;
-        memcpy(pcBuffer, &(store_stack), store_size);
-        pcBuffer += store_size;
-
-    } else if (sample != last_sample) {
-
-        last_sample = sample;
+    if (record_log == 0) {
         store_stack[0].flag = 'e';
         store_stack[0].start_addr = sample;
         // carefull !!!
         store_stack[0].length = numCost;
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
+        record_log = 1;
     }
-
 }
 
 void aprof_loop_in(int funcId, int loopId) {
-    if (pcBuffer == NULL) {
-        aprof_init();
-    }
     store_stack[0].flag = 'i';
     store_stack[0].start_addr = funcId;
     // carefull !!!
@@ -90,9 +78,6 @@ void aprof_loop_in(int funcId, int loopId) {
 
 
 void aprof_loop_out(int funcId, int loopId) {
-    if (pcBuffer == NULL) {
-        aprof_init();
-    }
     store_stack[0].flag = 'x';
     store_stack[0].start_addr = funcId;
     // carefull !!!
@@ -149,7 +134,5 @@ int aprof_geo(int iRate) {
 
     old_value = (int) geo_value;
     // log sampling call chain number
-//    sampling_count = count - sampling_count;
-//    log_fatal("sampling count: %ld;", sampling_count);
     return old_value;
 }

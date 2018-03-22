@@ -34,8 +34,6 @@ struct log_address {
 
 void aprof_init();
 
-void aprof_write(void *memory_addr, unsigned long length);
-
 void aprof_read(void *memory_addr, unsigned long length);
 
 void aprof_return(unsigned long numCost, int sample);

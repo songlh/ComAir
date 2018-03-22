@@ -19,7 +19,7 @@
 /*---- end ----*/
 
 /*---- share memory ---- */
-#define BUFFERSIZE (unsigned long) 1 << 33
+#define BUFFERSIZE (unsigned long) 1UL << 34
 #define APROF_MEM_LOG "/aprof_loop_log.log"
 
 /*---- end ----*/

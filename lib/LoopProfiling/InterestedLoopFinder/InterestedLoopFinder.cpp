@@ -1,150 +1,74 @@
-#include <map>
+#include <fstream>
 #include <set>
 #include <vector>
 
 #include "llvm/Analysis/LoopInfo.h"
-#include "llvm/IR/Constant.h"
-#include "llvm/IR/Constants.h"
-#include "llvm/IR/DebugInfo.h"
-#include "llvm/IR/Module.h"
+#include "llvm/IR/BasicBlock.h"
 #include "llvm/IR/Instructions.h"
-#include "llvm/Support/CommandLine.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/IR/InstrTypes.h"
+#include "llvm/IR/Module.h"
 
-
-#include "ArrayIdentifier/ArrayIdentifier.h"
 #include "Common/Helper.h"
-
+#include "LoopProfiling/InterestedLoopFinder/InterestedLoopFinder.h"
 
 using namespace std;
 
-static RegisterPass<ArrayIdentifier> X("array-identifier", "report a loop accessing an array element in each iteration",
-                                       true, false);
 
-static cl::opt<unsigned> uSrcLine("noLine",
-                                  cl::desc("Source Code Line Number for the Loop"), cl::Optional,
-                                  cl::value_desc("uSrcCodeLine"));
-
-static cl::opt<std::string> strFileName("strFile",
-                                        cl::desc("File Name for the Loop"), cl::Optional,
-                                        cl::value_desc("strFileName"));
-
-static cl::opt<std::string> strFuncName("strFunc",
-                                        cl::desc("Function Name"), cl::Optional,
-                                        cl::value_desc("strFuncName"));
+static RegisterPass<InterestedLoopFinder> X("interested-loop-finder",
+                                            "used to find interested loop", true, true);
 
 
-char ArrayIdentifier::ID = 0;
+static cl::opt<std::string> strFileName(
+        "strFileName",
+        cl::desc("The name of File to store system library"), cl::Optional,
+        cl::value_desc("strFileName"));
+
+/* local */
+std::set<Loop *> LoopSet; /*Set storing loop and subloop */
 
 
-Function *searchFunctionByName(Module &M, string &strFileName, string &strFunctionName, unsigned uSourceCodeLine) {
-    Function *pFunction = NULL;
-    char pPath[400];
+void getSubLoopSet(Loop *lp) {
 
-    for (Module::iterator FF = M.begin(), FFE = M.end(); FF != FFE; FF++) {
-        Function *pF = &*FF;
+    vector<Loop *> workList;
+    if (lp != NULL) {
+        workList.push_back(lp);
+    }
 
-        if (pF->getName().find(strFunctionName) != std::string::npos) {
-            map<string, pair<unsigned int, unsigned int>> mapFunctionBound;
+    while (workList.size() != 0) {
 
-            for (Function::iterator BB = FF->begin(), BBE = FF->end(); BB != BBE; ++BB) {
-                for (BasicBlock::iterator II = BB->begin(), IIE = BB->end(); II != IIE; ++II) {
-                    Instruction *I = &*II;
+        Loop *loop = workList.back();
+        LoopSet.insert(loop);
+        workList.pop_back();
 
-                    //if(MDNode *N = I->getMetadata("dbg"))
-                    const DILocation *Loc = I->getDebugLoc();
-                    if (Loc != NULL) {
-                        //DILocation Loc(N);
-                        string sFileNameForInstruction = getFileNameForInstruction(I);
-                        unsigned int uLineNoForInstruction = Loc->getLine();
+        if (loop != nullptr && !loop->empty()) {
 
-                        if (mapFunctionBound.find(sFileNameForInstruction) == mapFunctionBound.end()) {
-                            pair<unsigned int, unsigned int> tmpPair;
-                            tmpPair.first = uLineNoForInstruction;
-                            tmpPair.second = uLineNoForInstruction;
-                            mapFunctionBound[sFileNameForInstruction] = tmpPair;
-                        } else {
-                            if (mapFunctionBound[sFileNameForInstruction].first > uLineNoForInstruction) {
-                                mapFunctionBound[sFileNameForInstruction].first = uLineNoForInstruction;
-                            }
-
-                            if (mapFunctionBound[sFileNameForInstruction].second < uLineNoForInstruction) {
-                                mapFunctionBound[sFileNameForInstruction].second = uLineNoForInstruction;
-                            }
-
-                        } //else
-                    } //if( MDNode *N = i->getMetadata("dbg") )
-                }//for(BasicBlock::iterator ...)
-            } //for( Function::iterator ..)
-
-
-            map<string, pair<unsigned int, unsigned int> >::iterator itMapBegin = mapFunctionBound.begin();
-            map<string, pair<unsigned int, unsigned int> >::iterator itMapEnd = mapFunctionBound.end();
-            while (itMapBegin != itMapEnd) {
-                if (itMapBegin->first.find(strFileName) != string::npos) {
-                    if (itMapBegin->second.first <= uSourceCodeLine && itMapBegin->second.second >= uSourceCodeLine) {
-                        pFunction = pF;
-                        break;
+            std::vector<Loop *> &subloopVect = lp->getSubLoopsVector();
+            if (subloopVect.size() != 0) {
+                for (std::vector<Loop *>::const_iterator SI = subloopVect.begin(); SI != subloopVect.end(); SI++) {
+                    if (*SI != NULL) {
+                        if (LoopSet.find(*SI) == LoopSet.end()) {
+                            workList.push_back(*SI);
+                        }
                     }
                 }
-                itMapBegin++;
-            }
-        } // if( f->getName().find(strFunctionName) != std::string::npos )
-    } // for( Module::iterator ...)
 
-    return pFunction;
-}
-
-void searchBasicBlocksByLineNo(Function *F, unsigned uLineNo, vector<BasicBlock *> &vecBasicBlocks) {
-    for (Function::iterator BB = F->begin(); BB != F->end(); BB++) {
-        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
-            Instruction *I = &*II;
-            const DILocation *Loc = I->getDebugLoc();
-
-            if (Loc != NULL) {
-                if (uLineNo == Loc->getLine()) {
-                    vecBasicBlocks.push_back(&*BB);
-                    break;
-                }
             }
         }
     }
 }
 
-
-Loop *searchLoopByLineNo(Function *pFunction, LoopInfo *pLI, unsigned uLineNo) {
-    vector<BasicBlock *> vecBasicBlocks;
-    searchBasicBlocksByLineNo(pFunction, uLineNo, vecBasicBlocks);
-
-    unsigned int uDepth = 0;
-    BasicBlock *pBlock = NULL;
-
-    for (vector<BasicBlock *>::iterator itBegin = vecBasicBlocks.begin(); itBegin != vecBasicBlocks.end(); itBegin++) {
-        if (pLI->getLoopDepth(*itBegin) > uDepth) {
-            uDepth = pLI->getLoopDepth(*itBegin);
-            pBlock = *itBegin;
-        }
-    }
-
-    if (pBlock == NULL) {
-        set<Loop *> setLoop;
-
-        for (Function::iterator BB = pFunction->begin(); BB != pFunction->end(); BB++) {
-            if (pLI->getLoopDepth(&*BB) > 0) {
-                setLoop.insert(pLI->getLoopFor(&*BB));
+void getLoopSet(Loop *lp) {
+    if (lp != NULL && lp->getHeader() != NULL && !lp->empty()) {
+        LoopSet.insert(lp);
+        const std::vector<Loop *> &subloopVect = lp->getSubLoops();
+        if (!subloopVect.empty()) {
+            for (std::vector<Loop *>::const_iterator subli = subloopVect.begin(); subli != subloopVect.end(); subli++) {
+                Loop *subloop = *subli;
+                getLoopSet(subloop);
             }
         }
-
-        if (setLoop.size() == 1) {
-            return *(setLoop.begin());
-        }
-
-        return NULL;
     }
-
-    return pLI->getLoopFor(pBlock);
 }
-
 
 bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
     BasicBlock *pHeader = pLoop->getHeader();
@@ -194,6 +118,9 @@ bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
 }
 
 bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
+
+    setArrayValue.clear();
+
     map<Value *, vector<LoadInst *> > mapPArrValueAccess;
     set<BasicBlock *> setLoopBlocks;
 
@@ -215,7 +142,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
                     Value *vArrayValue = pSource->getPointerOperand();
                     mapPArrValueAccess[vArrayValue].push_back(pLoad);
 
-                    //vArrayValue->dump();
+//                    vArrayValue->dump();
                 }
             }
         }
@@ -302,6 +229,9 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
 }
 
 bool isArrayAccessLoop(Loop *pLoop, set<Value *> &setArrayValue) {
+
+    setArrayValue.clear();
+
     map<Value *, vector<LoadInst *> > mapPArrValueAccess;
     set<BasicBlock *> setLoopBlocks;
 
@@ -510,68 +440,300 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
 }
 
 
-void ArrayIdentifier::getAnalysisUsage(AnalysisUsage &AU) const {
-    AU.setPreservesCFG();
+/* end local */
+
+char InterestedLoopFinder::ID = 0;
+
+void InterestedLoopFinder::getAnalysisUsage(AnalysisUsage &AU) const {
+    AU.setPreservesAll();
     AU.addRequired<LoopInfoWrapperPass>();
 }
 
-ArrayIdentifier::ArrayIdentifier() : ModulePass(ID) {
+InterestedLoopFinder::InterestedLoopFinder() : ModulePass(ID) {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializeLoopInfoWrapperPassPass(Registry);
 }
 
-bool ArrayIdentifier::runOnModule(Module &M) {
-    Function *pFunction = searchFunctionByName(M, strFileName, strFuncName, uSrcLine);
+void InterestedLoopFinder::SetupTypes(Module *pModule) {
+    this->VoidType = Type::getVoidTy(pModule->getContext());
+    this->LongType = IntegerType::get(pModule->getContext(), 64);
+    this->IntType = IntegerType::get(pModule->getContext(), 32);
+}
 
-    if (pFunction == NULL) {
-        errs() << "Cannot find the input function\n";
-        return false;
+void InterestedLoopFinder::SetupConstants(Module *pModule) {
+    this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
+    this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
+}
+
+void InterestedLoopFinder::SetupGlobals(Module *pModule) {
+    assert(pModule->getGlobalVariable("numCost") == NULL);
+    this->numCost = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::ExternalLinkage, 0, "numCost");
+    this->numCost->setAlignment(8);
+    this->numCost->setInitializer(this->ConstantLong0);
+}
+
+void InterestedLoopFinder::SetupFunctions(Module *pModule) {
+    std::vector<Type *> ArgTypes;
+
+    // aprof_init
+    this->aprof_init = pModule->getFunction("aprof_init");
+
+    if (!this->aprof_init) {
+        FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_init = Function::Create(AprofInitType, GlobalValue::ExternalLinkage, "aprof_init", pModule);
+        ArgTypes.clear();
     }
 
-    LoopInfo &LoopInfo = getAnalysis<LoopInfoWrapperPass>(*pFunction).getLoopInfo();
+    // aprof_init
+    this->aprof_loop_in = pModule->getFunction("aprof_loop_in");
 
-    Loop *pLoop = searchLoopByLineNo(pFunction, &LoopInfo, uSrcLine);
+    if (!this->aprof_loop_in) {
+        ArgTypes.push_back(this->IntType);
+        ArgTypes.push_back(this->IntType);
+        FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_loop_in = Function::Create(AprofInitType, GlobalValue::ExternalLinkage, "aprof_loop_in", pModule);
+        ArgTypes.clear();
+    }
 
-    set<Value *> setArrayValue;
 
-    if (isArrayAccessLoop(pLoop, setArrayValue)) {
-        errs() << "\nFOUND ARRAY ACCESSING LOOP\n";
+    // aprof_init
+    this->aprof_loop_out = pModule->getFunction("aprof_loop_out");
 
-        set<Value *>::iterator itSetBegin = setArrayValue.begin();
-        set<Value *>::iterator itSetEnd = setArrayValue.end();
+    if (!this->aprof_loop_out) {
+        ArgTypes.push_back(this->IntType);
+        ArgTypes.push_back(this->IntType);
+        FunctionType *AprofInitType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_loop_out = Function::Create(AprofInitType, GlobalValue::ExternalLinkage, "aprof_loop_out", pModule);
+        ArgTypes.clear();
+    }
+}
 
-        while (itSetBegin != itSetEnd) {
-            (*itSetBegin)->dump();
-            itSetBegin++;
+void InterestedLoopFinder::SetupInit(Module *pModule) {
+    // all set up operation
+    this->pModule = pModule;
+    SetupTypes(pModule);
+    SetupConstants(pModule);
+    SetupGlobals(pModule);
+    SetupFunctions(pModule);
+}
+
+void InterestedLoopFinder::InstrumentLoopIn(Loop *pLoop) {
+
+    if (pLoop) {
+        BasicBlock *pLoopHeader = pLoop->getHeader();
+        if (pLoopHeader) {
+
+            int funcId = GetFunctionID(pLoopHeader->getParent());
+            int loopId = GetLoopID(pLoop);
+
+            ConstantInt *const_funId = ConstantInt::get(
+                    this->pModule->getContext(),
+                    APInt(32, StringRef(std::to_string(funcId)), 10));
+
+            ConstantInt *const_loopId = ConstantInt::get(
+                    this->pModule->getContext(),
+                    APInt(32, StringRef(std::to_string(loopId)), 10));
+
+            Instruction *Inst = &*pLoopHeader->getFirstInsertionPt();
+            std::vector<Value *> vecParams;
+            vecParams.push_back(const_funId);
+            vecParams.push_back(const_loopId);
+            CallInst *void_49 = CallInst::Create(this->aprof_loop_in, vecParams, "", Inst);
+            void_49->setCallingConv(CallingConv::C);
+            void_49->setTailCall(false);
+            AttributeList void_PAL;
+            void_49->setAttributes(void_PAL);
         }
-    } else if (isArrayAccessLoop1(pLoop, setArrayValue)) {
-        errs() << "\nFOUND ARRAY ACCESSING LOOP\n";
+    }
+}
 
-        set<Value *>::iterator itSetBegin = setArrayValue.begin();
-        set<Value *>::iterator itSetEnd = setArrayValue.end();
+void InterestedLoopFinder::InstrumentLoopOut(Loop *pLoop) {
+    if (pLoop) {
 
-        while (itSetBegin != itSetEnd) {
-            (*itSetBegin)->dump();
-            itSetBegin++;
+        SmallVector<BasicBlock *, 4> ExitBlocks;
+        pLoop->getExitBlocks(ExitBlocks);
+
+        for (unsigned long i = 0; i < ExitBlocks.size(); i++) {
+
+            if (ExitBlocks[i]) {
+
+                BasicBlock *ExitBB = ExitBlocks[i];
+
+                int funcId = GetFunctionID(ExitBB->getParent());
+                int loopId = GetLoopID(pLoop);
+
+                ConstantInt *const_funId = ConstantInt::get(
+                        this->pModule->getContext(),
+                        APInt(32, StringRef(std::to_string(funcId)), 10));
+
+                ConstantInt *const_loopId = ConstantInt::get(
+                        this->pModule->getContext(),
+                        APInt(32, StringRef(std::to_string(loopId)), 10));
+
+                Instruction *Inst = &*(ExitBB->getFirstInsertionPt());
+                std::vector<Value *> vecParams;
+                vecParams.push_back(const_funId);
+                vecParams.push_back(const_loopId);
+                CallInst *void_49 = CallInst::Create(this->aprof_loop_out, vecParams, "", Inst);
+                void_49->setCallingConv(CallingConv::C);
+                void_49->setTailCall(false);
+                AttributeList void_PAL;
+                void_49->setAttributes(void_PAL);
+
+            }
+        }
+    }
+}
+
+void InterestedLoopFinder::InstrumentLoop(Loop *pLoop) {
+
+    if (pLoop) {
+        InstrumentLoopIn(pLoop);
+        InstrumentLoopOut(pLoop);
+    }
+
+}
+
+void InterestedLoopFinder::InstrumentInit(Instruction *firstInst) {
+
+    CallInst *aprof_init_call = CallInst::Create(this->aprof_init, "", firstInst);
+    aprof_init_call->setCallingConv(CallingConv::C);
+    aprof_init_call->setTailCall(false);
+    AttributeList int32_call_PAL;
+    aprof_init_call->setAttributes(int32_call_PAL);
+
+}
+
+bool InterestedLoopFinder::runOnModule(Module &M) {
+    // setup init
+    SetupInit(&M);
+
+    if (strFileName.empty()) {
+        errs() << "Please set file name!" << "\n";
+        exit(1);
+    }
+
+    ofstream loopCounterFile;
+    loopCounterFile.open(strFileName, std::ofstream::out);
+    loopCounterFile << "FuncID,"
+                    << "LoopID,"
+                    << "FuncName,"
+                    << "ArrayLoop 0,"
+                    << "ArrayLoop 1,"
+                    << "LinkedListLoop"
+                    << "\n";
+
+    //identify loops, and store loop-header into HeaderSet
+    for (Module::iterator FI = M.begin(); FI != M.end(); FI++) {
+
+        Function *F = &*FI;
+        if (F->empty())
+            continue;
+
+        //clear loop set
+        LoopSet.clear();
+
+        LoopInfo &LoopInfo = getAnalysis<LoopInfoWrapperPass>(*F).getLoopInfo();
+
+        if (LoopInfo.empty()) {
+            continue;
+        }
+
+        for (auto &loop:LoopInfo) {
+            //LoopSet.insert(loop);
+            getSubLoopSet(loop); //including the loop itself
+        }
+
+        if (LoopSet.empty()) {
+            continue;
+        }
+
+        for (Loop *loop:LoopSet) {
+
+            if (loop == nullptr)
+                continue;
+
+            InstrumentLoop(loop);
+
+            // Array
+            set<Value *> setArrayValue;
+            bool isAAL_0 = isArrayAccessLoop(loop, setArrayValue);
+
+            if (isAAL_0) {
+                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
+//                set<Value *>::iterator itSetBegin = setArrayValue.begin();
+//                set<Value *>::iterator itSetEnd = setArrayValue.end();
+//
+//                while (itSetBegin != itSetEnd) {
+//                    (*itSetBegin)->dump();
+//                    itSetBegin++;
+//                }
+
+            }
+
+            bool isAAL_1 = isArrayAccessLoop1(loop, setArrayValue);
+            if (isAAL_1) {
+                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
+//                set<Value *>::iterator itSetBegin = setArrayValue.begin();
+//                set<Value *>::iterator itSetEnd = setArrayValue.end();
+//
+//                while (itSetBegin != itSetEnd) {
+//                    (*itSetBegin)->dump();
+//                    itSetBegin++;
+//                }
+            }
+
+            // linkedList
+            set<Value *> setLinkedValue;
+
+            bool isLLAL = isLinkedListAccessLoop(loop, setLinkedValue);
+            if (isLLAL) {
+                errs() << "\nFOUND Linked List ACCESSING LOOP\n";
+
+//                set<Value *>::iterator itSetBegin = setLinkedValue.begin();
+//                set<Value *>::iterator itSetEnd = setLinkedValue.end();
+//
+//                while (itSetBegin != itSetEnd) {
+//                    (*itSetBegin)->dump();
+//                    itSetBegin++;
+//                }
+            }
+
+            for (BasicBlock::iterator II = loop->getHeader()->begin(); II != loop->getHeader()->end(); II++) {
+
+                Instruction *inst = &*II;
+
+                const DILocation *DIL = inst->getDebugLoc();
+                if (!DIL)
+                    continue;
+
+                std::string str = printSrcCodeInfo(inst);
+                loopCounterFile << std::to_string(GetFunctionID(F)) << ","
+                                << std::to_string(GetLoopID(loop)) << ","
+                                << F->getName().str() << ","
+                                << str << ","
+                                << isAAL_0 << ","
+                                << isAAL_1 << ","
+                                << isLLAL << "\n";
+
+                break;
+            }
+
         }
     }
 
+    loopCounterFile.close();
 
-    set<Value *> setLinkedValue;
 
-    if (isLinkedListAccessLoop(pLoop, setLinkedValue)) {
-        errs() << "\nFOUND Linked List ACCESSING LOOP\n";
+    Function *pMain = M.getFunction("main");
+    assert(pMain != NULL);
+
+    if (pMain) {
+
+        Instruction *firstInst = pMain->getEntryBlock().getFirstNonPHI();
+        InstrumentInit(firstInst);
     }
 
-    errs() << setLinkedValue.size() << "\n";
-
-    set<Value *>::iterator itSetBegin = setLinkedValue.begin();
-    set<Value *>::iterator itSetEnd = setLinkedValue.end();
-
-    while (itSetBegin != itSetEnd) {
-        (*itSetBegin)->dump();
-        itSetBegin++;
-    }
 
     return false;
 }

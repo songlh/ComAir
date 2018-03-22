@@ -4,14 +4,14 @@ set(LIB_SOURCES
         )
 
 set(LIB_INCLUDE
-        ${PROJECT_SOURCE_DIR}/runtime/AProfLoopHooks/include
+        ${PROJECT_SOURCE_DIR}/runtime/AProfLoopSampleHooks/include
         )
 
-add_library(AProfLoopHooks STATIC
+add_library(AProfLoopSampleHooks STATIC
         ${LIB_SOURCES}
         )
 
-target_include_directories(AProfLoopHooks
+target_include_directories(AProfLoopSampleHooks
         PUBLIC ${LIB_INCLUDE}
         )
 

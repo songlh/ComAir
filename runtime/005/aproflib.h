@@ -30,11 +30,20 @@
 
 #define STACK_SIZE 2000
 
+void aprof_init_page_table();
+
+unsigned long aprof_query_page_table(unsigned long address);
+
+void aprof_insert_page_table(unsigned long start_addr,
+                             unsigned long length, unsigned long count);
+
 /*---- end ----*/
 
 /*---- share memory ---- */
-#define BUFFERSIZE 1UL << 34
+#define BUFFERSIZE (unsigned long) 1 << 33
 #define APROF_MEM_LOG "/aprof_log.log"
+
+char * aprof_init_share_mem();
 
 /*---- end ----*/
 
@@ -47,26 +56,24 @@ struct stack_elem {
     unsigned long long cost;
 };
 
-void aprof_init_page_table();
-
-unsigned long aprof_query_page_table(unsigned long address);
-
-void aprof_insert_page_table(unsigned long address, unsigned long count);
-
-void aprof_destroy_memory();
-
 void aprof_init();
 
 void aprof_write(void *memory_addr, unsigned long length);
 
 void aprof_read(void *memory, unsigned long length);
 
+void aprof_increment_cost();
+
 void aprof_increment_rms(unsigned long length);
 
 void aprof_call_before(int funcId);
 
+void aprof_collect();
+
+void aprof_call_after();
+
 void aprof_return(unsigned long numCost);
 
-/*---- end ----*/
+void aprof_final();
 
 #endif

@@ -17,15 +17,6 @@ BlockProfiler profiler; //simd utilization profiler
 
 using namespace std;
 
-int test_aa(int a) {
-    int b = 11;
-    if (a > 10) {
-        b += 10;
-    } else {
-        b += a;
-    }
-}
-
 int fib(int n) {
 #ifdef BLOCK_PROFILE
     profiler.record_single();

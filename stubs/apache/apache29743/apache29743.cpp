@@ -251,7 +251,7 @@ int main(int argc, char ** argv)
   }
   
   string sTest = string(argv[1]);
-  //Test(sTest);  
-  Test2();
+  Test(sTest);
+//  Test2();
   return 0;
 }

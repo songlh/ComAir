@@ -13,13 +13,15 @@
 #include <assert.h>
 
 struct stack_elem {
-    int stack_index; // function id
+//    int funcId; // function id
+    unsigned long stack_index;
     unsigned long cost;
+
 };
 
 /*---- share memory ---- */
 #define BUFFERSIZE 1UL << 34
-#define APROF_MEM_LOG "/aprof_log.log"
+#define APROF_MEM_LOG "/aprof_recu_log.log"
 
 
 // logger
@@ -101,8 +103,8 @@ void read_shared_momery() {
     memcpy(&Ele, ptr, sizeof(Ele));
     log_fatal("Stack_Index,Cost");
 
-    while (!(Ele.stack_index == 0 && Ele.cost == 0)) {
-        log_fatal("%d,%ld",
+    while (Ele.cost != 0) {
+        log_fatal("%ld,%ld",
                   Ele.stack_index,
                   Ele.cost
         );

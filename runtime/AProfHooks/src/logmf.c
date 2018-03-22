@@ -102,9 +102,9 @@ void read_shared_momery() {
 
     puts("start reading data....");
     memcpy(&Ele, ptr, sizeof(Ele));
-
+    log_fatal("funcId,rms,cost");
     while (Ele.funcId > 0) {
-        log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
+        log_fatal("%d,%ld,%ld",
                   Ele.funcId,
                   Ele.rms,
                   Ele.cost

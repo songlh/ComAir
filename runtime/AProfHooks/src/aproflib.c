@@ -19,95 +19,39 @@ unsigned long *prev_pL3 = NULL;
 unsigned long count = 0;
 
 struct stack_elem shadow_stack[STACK_SIZE];
-int stack_top = -1;
+int stack_top = 0;
 
 // share memory
 int fd;
-char *pBuffer;
+void *pcBuffer;
 unsigned int struct_size = sizeof(struct stack_elem);
 
-// sampling
-unsigned long sampling_count = 0;
-static int old_value = -1;
-
-// logger
-
-static void lock(void) {
-    if (L.lock) {
-        L.lock(L.udata, 1);
-    }
-}
-
-static void unlock(void) {
-    if (L.lock) {
-        L.lock(L.udata, 0);
-    }
-}
-
-void log_set_udata(void *udata) {
-    L.udata = udata;
-}
-
-void log_set_lock(log_LockFn fn) {
-    L.lock = fn;
-}
-
-void log_set_fp(FILE *fp) {
-    L.fp = fp;
-}
-
-void log_set_level(int level) {
-    L.level = level;
-}
-
-void log_set_quiet(int enable) {
-    L.quiet = enable ? 1 : 0;
-}
-
-void log_init(FILE *fp, int level, int enable) {
-    L.fp = fp;
-    L.level = level;
-    L.quiet = enable ? 1 : 0;
-}
-
-void log_log(int level, const char *file, int line, const char *fmt, ...) {
-    if (level < L.level) {
-        return;
-    }
-
-    /* Acquire lock */
-    lock();
-
-    /* Log to file */
-    if (L.fp) {
-        va_list args;
-        va_start(args, fmt);
-        vfprintf(L.fp, fmt, args);
-        va_end(args);
-        fprintf(L.fp, "\n");
-    }
-
-    /* Release lock */
-    unlock();
-}
-
-void aprof_logger_init() {
-    const char *FILENAME = "aprof_logger.txt";
-    int LEVEL = 4;  // "TRACE" < "DEBUG" < "INFO" < "WARN" < "ERROR" < "FATAL"
-    int QUIET = 1;
-    FILE *fp = fopen(FILENAME, "w");
-    log_init(fp, LEVEL, QUIET);
-
-}
 
 // aprof api
+
+void aprof_init() {
+
+    // init share memory
+    fd = shm_open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
+
+    if (fd < 0) {
+        fd = shm_open(APROF_MEM_LOG, O_RDWR, 0777);
+
+    } else
+        ftruncate(fd, BUFFERSIZE);
+
+    pcBuffer = (void *) mmap(0, BUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, 0);
+
+    // init page table
+    pL0 = (void **) malloc(sizeof(void *) * L0_TABLE_SIZE);
+    memset(pL0, 0, sizeof(void *) * L0_TABLE_SIZE);
+}
 
 unsigned long aprof_query_page_table(unsigned long addr) {
 
     if ((addr & NEG_L3_MASK) == prev) {
         return prev_pL3[addr & L3_MASK];
     }
-
 
     unsigned long tmp = (addr & L0_MASK) >> 28;
 
@@ -140,52 +84,126 @@ unsigned long aprof_query_page_table(unsigned long addr) {
 }
 
 
-void aprof_insert_page_table(unsigned long addr, unsigned long count) {
+void aprof_insert_page_table(unsigned long start_addr,
+                             unsigned long length, unsigned long count) {
 
-    if ((addr & NEG_L3_MASK) == prev) {
-        prev_pL3[addr & L3_MASK] = count;
-        return;
+    unsigned long end_addr = start_addr + length;
+
+    for (; start_addr < end_addr; start_addr++) {
+
+        if ((start_addr & NEG_L3_MASK) == prev) {
+            prev_pL3[start_addr & L3_MASK] = count;
+            continue;
+        }
+
+
+        unsigned long tmp = (start_addr & L0_MASK) >> 28;
+
+        if (pL0[tmp] == NULL) {
+            pL0[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
+            memset(pL0[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
+        }
+
+        pL1 = (void **) pL0[tmp];
+
+        tmp = (start_addr & L1_MASK) >> 19;
+
+        if (pL1[tmp] == NULL) {
+
+            pL1[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
+            memset(pL1[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
+        }
+
+        pL2 = (void **) pL1[tmp];
+
+        tmp = (start_addr & L2_MASK) >> 10;
+
+        if (pL2[tmp] == NULL) {
+            pL2[tmp] = (unsigned long *) malloc(sizeof(unsigned long) * L3_TABLE_SIZE);
+            memset(pL2[tmp], 0, sizeof(unsigned long) * L3_TABLE_SIZE);
+        }
+
+        pL3 = (unsigned long *) pL2[tmp];
+
+        prev = start_addr & NEG_L3_MASK;
+        prev_pL3 = pL3;
+
+        pL3[start_addr & L3_MASK] = count;
     }
-
-
-    unsigned long tmp = (addr & L0_MASK) >> 28;
-
-    if (pL0[tmp] == NULL) {
-        pL0[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
-        memset(pL0[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
-    }
-
-    pL1 = (void **) pL0[tmp];
-
-    tmp = (addr & L1_MASK) >> 19;
-
-    if (pL1[tmp] == NULL) {
-
-        pL1[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
-        memset(pL1[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
-    }
-
-    pL2 = (void **) pL1[tmp];
-
-    tmp = (addr & L2_MASK) >> 10;
-
-    if (pL2[tmp] == NULL) {
-        pL2[tmp] = (unsigned long *) malloc(sizeof(unsigned long) * L3_TABLE_SIZE);
-        memset(pL2[tmp], 0, sizeof(unsigned long) * L3_TABLE_SIZE);
-    }
-
-    pL3 = (unsigned long *) pL2[tmp];
-
-    prev = addr & NEG_L3_MASK;
-    prev_pL3 = pL3;
-
-    pL3[addr & L3_MASK] = count;
 
 }
 
 
-void aprof_destroy_memory() {
+void aprof_write(void *memory_addr, unsigned long length) {
 
+    unsigned long start_addr = (unsigned long) memory_addr;
+    aprof_insert_page_table(start_addr, length, count);
+
+}
+
+
+void aprof_read(void *memory_addr, unsigned long length) {
+
+    unsigned long start_addr = (unsigned long) memory_addr;
+    unsigned long end_addr = start_addr + length;
+    int j = stack_top;
+
+    for (; start_addr < end_addr; start_addr++) {
+
+        // We assume that w has been wrote before reading.
+        // ts[w] > 0 and ts[w] < S[top]
+        unsigned long ts_w = aprof_query_page_table(start_addr);
+        if (ts_w < shadow_stack[stack_top].ts) {
+
+            shadow_stack[stack_top].rms++;
+
+            if (ts_w != 0) {
+                for (; j > 0; j--) {
+
+                    if (shadow_stack[j].ts <= ts_w) {
+                        shadow_stack[j].rms--;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    aprof_insert_page_table(start_addr, length, count);
+}
+
+
+void aprof_increment_rms(unsigned long length) {
+    shadow_stack[stack_top].rms += length;
+
+}
+
+
+void aprof_call_before(int funcId) {
+    count++;
+    stack_top++;
+    shadow_stack[stack_top].funcId = funcId;
+    shadow_stack[stack_top].ts = count;
+    shadow_stack[stack_top].rms = 0;
+    // newEle->cost update in aprof_return
+    shadow_stack[stack_top].cost = 0;
+
+}
+
+
+void aprof_return(unsigned long numCost) {
+
+    shadow_stack[stack_top].cost += numCost;
+
+    memcpy(pcBuffer, &(shadow_stack[stack_top]), struct_size);
+    pcBuffer += struct_size;
+    shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
+    shadow_stack[stack_top - 1].cost += shadow_stack[stack_top].cost;
+    stack_top--;
+
+}
+
+void aprof_final() {
     // close  share memory
     close(fd);
 
@@ -219,189 +237,4 @@ void aprof_destroy_memory() {
     }
 
     free(pL0);
-}
-
-
-char *aprof_init_share_mem() {
-
-    fd = shm_open(APROF_MEM_LOG, O_RDWR | O_CREAT | O_EXCL, 0777);
-
-    if (fd < 0) {
-        fd = shm_open(APROF_MEM_LOG, O_RDWR, 0777);
-
-    } else
-        ftruncate(fd, BUFFERSIZE);
-
-    char *pcBuffer = (char *) mmap(0, BUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
-    return pcBuffer;
-}
-
-
-void aprof_init() {
-
-    // init share memory
-//    pBuffer = aprof_init_share_mem();
-    aprof_logger_init();
-    // init page table
-    pL0 = (void **) malloc(sizeof(void *) * L0_TABLE_SIZE);
-    memset(pL0, 0, sizeof(void *) * L0_TABLE_SIZE);
-}
-
-
-void aprof_write(void *memory_addr, unsigned long length) {
-    unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long i = start_addr;
-    unsigned long end_addr = start_addr + length;
-
-    for (; i < end_addr; i++) {
-        aprof_insert_page_table(i, count);
-
-    }
-
-    log_trace("aprof_write: funcID %d, memory_adrr is %ld, lenght is %ld",
-              shadow_stack[stack_top].funcId, start_addr, length);
-
-}
-
-
-void aprof_read(void *memory_addr, unsigned long length) {
-
-    unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long i = start_addr;
-    unsigned long end_addr = start_addr + length;
-    int j;
-
-    log_trace("aprof_read: funcID %d, memory_adrr is %ld, length is %ld",
-              shadow_stack[stack_top].funcId, start_addr, length);
-
-    for (; i < end_addr; i++) {
-
-        // We assume that w has been wrote before reading.
-        // ts[w] > 0 and ts[w] < S[top]
-        unsigned long ts_w = aprof_query_page_table(i);
-        if (stack_top > -1 && ts_w < shadow_stack[stack_top].ts) {
-
-            shadow_stack[stack_top].rms++;
-
-            if (ts_w != 0) {
-                for (j = stack_top; j > 0; j--) {
-
-                    if (shadow_stack[j].ts <= ts_w) {
-                        shadow_stack[j].rms--;
-                        break;
-                    }
-                }
-            }
-        }
-
-        aprof_insert_page_table(i, count);
-    }
-
-}
-
-
-void aprof_increment_rms(unsigned long length) {
-    shadow_stack[stack_top].rms += length;
-
-}
-
-
-void aprof_call_before(int funcId) {
-    count++;
-    stack_top++;
-    shadow_stack[stack_top].funcId = funcId;
-    shadow_stack[stack_top].ts = count;
-    shadow_stack[stack_top].rms = 0;
-    // newEle->cost update in aprof_return
-    shadow_stack[stack_top].cost = 0;
-    log_debug("aprof_call_before: funcID %d",
-              shadow_stack[stack_top].funcId);
-
-}
-
-
-void aprof_return(unsigned long numCost) {
-
-    shadow_stack[stack_top].cost += numCost;
-
-//    memcpy(pBuffer, &(shadow_stack[stack_top]), struct_size);
-//    pBuffer += struct_size;
-    log_fatal("ID %d ; RMS %ld ; Cost %ld ;",
-              shadow_stack[stack_top].funcId,
-              shadow_stack[stack_top].rms,
-              shadow_stack[stack_top].cost
-    );
-
-    if (stack_top >= 1) {
-
-        shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;
-        shadow_stack[stack_top - 1].cost += shadow_stack[stack_top].cost;
-        stack_top--;
-
-    } else {
-        // destroy  memory.
-        aprof_destroy_memory();
-        log_debug("aprof_return: last funcID %d",
-                  shadow_stack[stack_top].funcId);
-    }
-
-}
-
-
-static double aprof_rand_val(int seed) {
-    const long a = 16807;  // Multiplier
-    const long m = 2147483647;  // Modulus
-    const long q = 127773;  // m div a
-    const long r = -2836;  // m mod a
-    static long x;               // Random int value
-    long x_div_q;         // x divided by q
-    long x_mod_q;         // x modulo q
-    long x_new;           // New x value
-
-    // Set the seed if argument is non-zero and then return zero
-    if (seed > 0) {
-        x = seed;
-        return (0.0);
-    }
-
-    // RNG using integer arithmetic
-    x_div_q = x / q;
-    x_mod_q = x % q;
-    x_new = (a * x_mod_q) - (r * x_div_q);
-    if (x_new > 0)
-        x = x_new;
-    else
-        x = x_new + m;
-
-    // Return a random value between 0.0 and 1.0
-    return ((double) x / m);
-}
-
-
-int aprof_geo(int iRate) {
-    double p = 1 / (double) iRate;
-    double z;                     // Uniform random number (0 < z < 1)
-    double geo_value;             // Computed geometric value to be returned
-
-    do {
-        // Pull a uniform random number (0 < z < 1)
-        do {
-            z = aprof_rand_val(0);
-        } while ((z == 0) || (z == 1));
-
-        // Compute geometric random variable using inversion method
-        geo_value = (int) (log(z) / log(1.0 - p)) + 1;
-    } while ((int) geo_value == old_value + 1);
-
-    old_value = (int) geo_value;
-    // log sampling call chain number
-//    sampling_count = count - sampling_count;
-//    log_fatal("sampling count: %ld;", sampling_count);
-    return old_value;
-}
-
-
-// this is bb profiling
-void PrintExecutionCost(long numCost) {
-    printf("%ld", numCost);
 }

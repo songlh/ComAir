@@ -1,5 +1,5 @@
 CXX=clang
-CFLAGS=-O0 -Xclang -disable-O0-optnone -g -flto
+CFLAGS=-O2 -Xclang -disable-O0-optnone -g -flto
 LDFLAGS=-use-gold-plugin -Wl,-plugin-opt=save-temps
 TARGET=target
 

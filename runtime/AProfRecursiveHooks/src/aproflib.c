@@ -5,11 +5,9 @@ int fd;
 void *pcBuffer;
 unsigned int store_size = sizeof(struct stack_elem);
 struct stack_elem store_stack[1];
-unsigned long shadow_stack[STACK_SIZE];
 int stack_top = -1;
 
 // sampling
-int sampling = 0;
 static int old_value = -1;
 
 void aprof_init() {
@@ -26,27 +24,21 @@ void aprof_init() {
 
 }
 
-void aprof_call_in(int funcID, unsigned long numCost) {
+void aprof_call_in(int funcID, unsigned long numCost, unsigned long callStack) {
 
-    stack_top++;
-    shadow_stack[stack_top] = numCost;
+    store_stack[0].cost = numCost;
+    store_stack[0].stack_index = callStack;
+    memcpy(pcBuffer, &(store_stack), store_size);
+    pcBuffer += store_size;
 
 }
 
-void aprof_return(int funcID, unsigned long numCost) {
+void aprof_return(int funcID, unsigned long numCost, unsigned long callStack) {
 
-    store_stack[0].cost = numCost - shadow_stack[stack_top];
-    store_stack[0].stack_index = stack_top;
-
-    if (sampling <= 0) {
-        memcpy(pcBuffer, &(store_stack), store_size);
-        pcBuffer += store_size;
-        sampling = aprof_geo(SAMPLING_RATE);
-//        printf("%d\n", sampling);
-    }
-
-    stack_top--;
-    sampling--;
+    store_stack[0].cost = numCost;
+    store_stack[0].stack_index = callStack;
+    memcpy(pcBuffer, &(store_stack), store_size);
+    pcBuffer += store_size;
 
 }
 

@@ -6,9 +6,9 @@ struct log_address store_stack[1];
 
 // share memory
 int fd;
-void *pcBuffer;
+void *pcBuffer = NULL;
 unsigned int store_size = sizeof(struct log_address);
-int last_sample = 0;
+int record_flag = 0;
 
 // sampling
 static int old_value = -1;
@@ -41,11 +41,25 @@ void aprof_write(void *memory_addr, unsigned long length) {
 
 
 void aprof_read(void *memory_addr, unsigned long length) {
-    store_stack[0].flag = 'r';
-    store_stack[0].start_addr = (unsigned long) memory_addr;
-    store_stack[0].length = length;
-    memcpy(pcBuffer, &(store_stack), store_size);
-    pcBuffer += store_size;
+    unsigned long star_addr = (unsigned long) memory_addr;
+//    if (record_flag == 1) {
+//        store_stack[0].flag = 'r';
+//        store_stack[0].start_addr = (unsigned long) memory_addr;
+//        store_stack[0].length = length;
+//        memcpy(pcBuffer, &(store_stack), store_size);
+//        pcBuffer += store_size;
+//        record_flag = 0;
+//    }
+//
+//    else if (star_addr != store_stack[0].start_addr || store_stack[0].length != length) {
+        store_stack[0].flag = 'r';
+        store_stack[0].start_addr = star_addr;
+        store_stack[0].length = length;
+        memcpy(pcBuffer, &(store_stack), store_size);
+        pcBuffer += store_size;
+        record_flag = 0;
+//    }
+
 }
 
 
@@ -59,9 +73,8 @@ void aprof_return(unsigned long numCost, int sample) {
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
 
-    } else if (sample != last_sample) {
-
-        last_sample = sample;
+    } else {
+        record_flag = 1;
         store_stack[0].flag = 'e';
         store_stack[0].start_addr = sample;
         // carefull !!!
@@ -69,6 +82,7 @@ void aprof_return(unsigned long numCost, int sample) {
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
     }
+
 }
 
 void aprof_loop_in(int funcId, int loopId) {

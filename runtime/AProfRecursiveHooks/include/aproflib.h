@@ -16,17 +16,14 @@
 
 struct stack_elem {
 //    int funcId; // function id
-    int stack_index;
+    unsigned long stack_index;
     unsigned long cost;
 
 };
 
-#define STACK_SIZE 2000
-#define SAMPLING_RATE 100
-
 /*---- share memory ---- */
-#define BUFFERSIZE (unsigned long) 1 << 33
-#define APROF_MEM_LOG "/aprof_log.log"
+#define BUFFERSIZE (unsigned long) 1UL << 34
+#define APROF_MEM_LOG "/aprof_recu_log.log"
 
 char * aprof_init_share_mem();
 
@@ -35,9 +32,9 @@ char * aprof_init_share_mem();
 
 void aprof_init();
 
-void aprof_call_in(int funcID, unsigned long numCost);
+void aprof_call_in(int funcID, unsigned long numCost, unsigned long callStack);
 
-void aprof_return(int funcID, unsigned long numCost);
+void aprof_return(int funcID, unsigned long numCost, unsigned long callStack);
 
 /*---- sampling generator ----*/
 

@@ -1,0 +1,42 @@
+CXX=clang
+CFLAGS=-O0 -Xclang -disable-O0-optnone -g -flto
+OP_CFLAGS=-O2 -Xclang -disable-O0-optnone -g -flto
+LDFLAGS=-use-gold-plugin -Wl,-plugin-opt=save-temps
+TARGET=target
+
+HOME_PATH=/home/tzt77/Develop/ComAir
+ID_PASS=cmake-build-debug/lib/IDAssigner/libIDAssignerPass.so
+PRE_SAMPLE_PASS=cmake-build-debug/lib/RecursiveProfiling/PrepareSampling/libPrepareSamplingPass.so
+RECU_PASS=cmake-build-debug/lib/RecursiveProfiling/RecursiveInterestedHook/libRecursiveInterestedHookPass.so
+INLINE_PASS=cmake-build-debug/lib/MakeFunctionInline/libMakeFunctionInlinePass.so
+
+RUNTIME_LIB=stubs/runtime/aproflib-recursive.bc
+
+all: target target.recu.sample
+
+target: target.bc
+	${CXX} ${OP_CFLAGS} ${LDFLAGS} target.bc -o target
+
+target.recu.sample: target.inline.bc
+	${CXX} ${OP_CFLAGS} ${LDFLAGS} target.inline.bc -lm -lrt -o target.recu.sample
+
+target.inline.bc: target.pre.inline.bc
+	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 0 target.pre.inline.bc > target.inline.bc
+
+target.pre.inline.bc: target.re.id.bc
+	llvm-link ${RUNTIME_LIB} target.re.id.bc -o target.pre.inline.bc
+
+target.re.id.bc: target.pre.id.bc
+	opt -load ${HOME_PATH}/${RECU_PASS} -interested-recursive-hook -is-sampling 1 -strFuncName fib -strFileName recu_func_name_id.log  target.pre.id.bc > target.re.id.bc
+
+target.pre.id.bc: target.id.bc
+	opt -load ${HOME_PATH}/${PRE_SAMPLE_PASS}  -prepare-sampling -strFuncName fib -sample-rate 1000 target.id.bc > target.pre.id.bc
+
+target.id.bc: target.bc
+	opt -load ${HOME_PATH}/${ID_PASS} -tag-id target.bc > target.id.bc
+
+target.bc: fib.c
+	${CXX} ${CFLAGS} fib.c -c -o target.bc
+
+clean:
+	rm -rf *.o ${TARGET} ${TARGET}.opt *.bc *.resolution.txt *.id target.aprof *.ll *.aprof *.inline *.txt *.loop.sample

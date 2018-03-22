@@ -1,0 +1,44 @@
+CXX=clang
+CFLAGS=-O0 -Xclang -disable-O0-optnone -g -flto
+OP_CFLAGS=-O2 -Xclang -disable-O0-optnone -g -flto
+LDFLAGS=-use-gold-plugin -Wl,-plugin-opt=save-temps
+TARGET=target
+
+HOME_PATH=/home/tzt77/Develop/ComAir
+ID_PASS=cmake-build-debug/lib/IDAssigner/libIDAssignerPass.so
+LOOP_PASS=cmake-build-debug/lib/LoopProfiling/LoopInterestedHook/libLoopInterestedHookPass.so
+INLINE_PASS=cmake-build-debug/lib/MakeFunctionInline/libMakeFunctionInlinePass.so
+
+RUNTIME_LIB=stubs/runtime/aproflib-loop-sample.bc
+
+all: target aproflib.inline.bc target.loop.sample
+
+target: target.bc
+	${CXX} ${OP_CFLAGS} ${LDFLAGS} target.bc -o target
+
+target.loop.sample: target.inline.bc
+	${CXX} ${OP_CFLAGS} ${LDFLAGS} target.inline.bc -lm -lrt -o target.loop.sample
+
+target.inline.bc: target.pre.inline.bc
+	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 0 target.pre.inline.bc > target.inline.bc
+
+target.pre.inline.bc: target.aprof.bc
+	llvm-link aproflib.inline.bc target.aprof.bc -o target.pre.inline.bc
+
+aproflib.inline.bc: ${HOME_PATH}/${RUNTIME_LIB}
+	opt -load ${HOME_PATH}/${INLINE_PASS} -func-inline -lib-inline 1 ${HOME_PATH}/${RUNTIME_LIB} > aproflib.inline.bc
+
+target.aprof.bc: target.bc.id
+	opt -load ${HOME_PATH}/${LOOP_PASS} -interested-loop-hook -noInnerLine 168 -strInnerFunc ArrayList_indexOf -noOuterLine 258 -strOuterFunc ArrayList_batchRemove -strLoopHeader for.cond  -sampleRate 100  target.bc.id > target.aprof.bc
+
+target.bc.id: target.merge.bc
+	opt -load ${HOME_PATH}/${ID_PASS} -tag-id target.merge.bc > target.bc.id
+
+target.merge.bc: target.bc
+	opt -mergereturn  target.bc > target.merge.bc
+
+target.bc: apache53622.c
+	${CXX} ${CFLAGS} apache53622.c -c -o target.bc
+
+clean:
+	rm -rf *.o ${TARGET} ${TARGET}.opt *.bc *.resolution.txt *.id target.aprof *.ll *.aprof *.inline *.txt *.loop.sample

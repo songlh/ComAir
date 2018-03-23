@@ -192,6 +192,9 @@ bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
 }
 
 bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
+
+    setArrayValue.clear();
+
     map<Value *, vector<LoadInst *> > mapPArrValueAccess;
     set<BasicBlock *> setLoopBlocks;
 
@@ -213,11 +216,13 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
                     Value *vArrayValue = pSource->getPointerOperand();
                     mapPArrValueAccess[vArrayValue].push_back(pLoad);
 
-                    //vArrayValue->dump();
+//                    vArrayValue->dump();
                 }
             }
         }
     }
+
+//    errs() << "Array 1" << mapPArrValueAccess.size() << "\n";
 
     if (mapPArrValueAccess.size() == 0) {
         return false;
@@ -244,6 +249,8 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
         }
     }
 
+//    errs() << "Array 1" << setPArrValue.size() << "\n";
+
     if (setPArrValue.size() == 0) {
         return false;
     }
@@ -254,36 +261,56 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
 
 
     while (itSetBegin != itSetEnd) {
+
         set<BasicBlock *> setStoreBlocks;
 
         for (User *U:  (*itSetBegin)->users()) {
+
             if (GetElementPtrInst *pGet = dyn_cast<GetElementPtrInst>(U)) {
+
                 if (setLoopBlocks.find(pGet->getParent()) == setLoopBlocks.end()) {
                     continue;
                 }
 
-                if (pGet->getNumOperands() != 2) {
-                    continue;
-                }
+                if (pGet->getNumOperands() == 2) {
 
-                Value *vOffset = pGet->getOperand(1);
+                    Value *vOffset = pGet->getOperand(1);
 
-                while (CastInst *pCast = dyn_cast<CastInst>(vOffset)) {
-                    vOffset = pCast->getOperand(0);
-                }
+                    while (CastInst *pCast = dyn_cast<CastInst>(vOffset)) {
+                        vOffset = pCast->getOperand(0);
+                    }
 
-                if (LoadInst *pLoad = dyn_cast<LoadInst>(vOffset)) {
-                    for (User *UOffset : pLoad->getOperand(0)->users()) {
-                        if (StoreInst *pStore = dyn_cast<StoreInst>(UOffset)) {
-                            if (setLoopBlocks.find(pStore->getParent()) != setLoopBlocks.end()) {
-                                setStoreBlocks.insert(pStore->getParent());
+                    if (LoadInst *pLoad = dyn_cast<LoadInst>(vOffset)) {
+
+                        for (User *UOffset : pLoad->getOperand(0)->users()) {
+                            if (StoreInst *pStore = dyn_cast<StoreInst>(UOffset)) {
+                                if (setLoopBlocks.find(pStore->getParent()) != setLoopBlocks.end()) {
+                                    setStoreBlocks.insert(pStore->getParent());
+                                }
                             }
                         }
                     }
-                }
 
+                } else if (pGet->getNumOperands() == 3) {
+
+                    Value *vElePtr = pGet->getOperand(0);
+                    if (LoadInst *pLoad = dyn_cast<LoadInst>(vElePtr)) {
+                        for (User *UOffset : pLoad->getOperand(0)->users()) {
+                            if (StoreInst *pStore = dyn_cast<StoreInst>(UOffset)) {
+                                if (setLoopBlocks.find(pStore->getParent()) != setLoopBlocks.end()) {
+                                    setStoreBlocks.insert(pStore->getParent());
+                                }
+                            }
+                        }
+                    }
+
+                } else {
+                    continue;
+                }
             }
         }
+
+//        errs() << "Array 1 st" << setStoreBlocks.size() << "\n";
 
         if (isOneStarLoop(pLoop, setStoreBlocks)) {
             setArrayValue.insert(*itSetBegin);

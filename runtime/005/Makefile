@@ -5,9 +5,9 @@ CFLAGS=-flto -use-gold-plugin -Wl,-plugin-opt=save-temps -Xclang -disable-O0-opt
 TARGET=aproflib
 
 
-aproflib.bc: aproflib.c
-	${CXX} ${CFLAGS} -c aproflib.c -o aproflib.bc
+aproflib.o: aproflib.c
+	${CXX} ${CFLAGS} -c aproflib.c -o aproflib.o
 
 
 clean:
-	rm -rf *.bc ${TARGET}
+	rm -rf *.o ${TARGET}

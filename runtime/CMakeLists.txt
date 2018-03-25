@@ -1,3 +1,4 @@
 add_subdirectory(AProfHooks)
 add_subdirectory(AProfRecursiveHooks)
+add_subdirectory(AProfLoopArrayListHooks)
 add_subdirectory(AProfLoopSampleHooks)

@@ -1,2 +1,4 @@
 add_subdirectory(LoopInterestedHook)
 add_subdirectory(InterestedLoopFinder)
+add_subdirectory(ArrayListSampleInstrument)
+add_subdirectory(ArrayListInstrument)

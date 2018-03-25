@@ -63,7 +63,7 @@ bool MakeFunctionInline::runOnModule(Module &M) {
             "destroy_page_table", "rand_val"};
 
     std::set<std::string> BCInlineFuncStr = {
-            "aprof_read", "aprof_write", "aprof_increment_rms",
+            "aprof_read", "aprof_write", "aprof_increment_rms", "aprof_dump",
             "aprof_init", "aprof_call_before", "aprof_return", "aprof_geo", "aprof_final"
     };
 

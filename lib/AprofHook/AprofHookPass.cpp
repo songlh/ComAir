@@ -213,8 +213,7 @@ void AprofHook::InstrumentInit(Instruction *firstInst) {
 
 void AprofHook::InstrumentCostUpdater(Function *pFunction, bool isOptimized) {
 
-    Instruction *pInstBefore = pFunction->getEntryBlock().getFirstNonPHI();;
-
+    Instruction *pInstBefore = pFunction->getEntryBlock().getFirstNonPHI();
 
     this->BBAllocInst = new AllocaInst(this->LongType, 0, "numCost", pInstBefore);
     this->BBAllocInst->setAlignment(8);

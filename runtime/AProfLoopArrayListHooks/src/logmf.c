@@ -10,17 +10,17 @@
 #include <sys/mman.h>
 #include <time.h>
 #include <unistd.h>
+#include <assert.h>
+
 
 struct stack_elem {
-    int funcId; // function id
-    unsigned long ts; // time stamp
-    unsigned long rms;
-    unsigned long cost;
+    unsigned long  numCost;
+    int  length;
 };
 
 /*---- share memory ---- */
 #define BUFFERSIZE 1UL << 34
-#define APROF_MEM_LOG "/aprof_log.log"
+#define APROF_MEM_LOG "/aprof_loop_arry_list_log.log"
 
 
 // logger
@@ -100,12 +100,11 @@ void read_shared_momery() {
 
     puts("start reading data....");
     memcpy(&Ele, ptr, sizeof(Ele));
-
-    while (Ele.funcId > 0) {
-        log_fatal(" ID %d ; RMS %ld ; Cost %ld ;",
-                  Ele.funcId,
-                  Ele.rms,
-                  Ele.cost
+    log_fatal("numCost,length");
+    while (Ele.numCost > 0) {
+        log_fatal("%ld,%ld",
+                  Ele.numCost,
+                  Ele.length
         );
         ptr += size_of_ele;
         memcpy(&Ele, ptr, size_of_ele);
@@ -119,7 +118,11 @@ void read_shared_momery() {
 
 int main() {
 
-    const char *FILENAME = "/tmp/aprof_logger.txt";
+    char FILENAME[] = "aprof_loop_logger_array_list_XXXXXX";
+    int fd;
+    fd = mkstemp(FILENAME);
+    assert(fd > 0);
+
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");
     log_init(fp, 4, QUIET);

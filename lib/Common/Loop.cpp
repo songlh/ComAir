@@ -166,8 +166,6 @@ bool ProcessInstruction(Instruction *Inst, std::set<BasicBlock *> &ExitBlocks, D
 
 void LoopSimplify(Loop *pLoop, DominatorTree *DT) {
 
-    Function *pFunction = pLoop->getHeader()->getParent();
-
     //add predecessor
     BasicBlock *pPreHeader = pLoop->getLoopPreheader();
 

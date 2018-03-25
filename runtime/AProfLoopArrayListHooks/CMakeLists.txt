@@ -4,14 +4,14 @@ set(LIB_SOURCES
         )
 
 set(LIB_INCLUDE
-        ${PROJECT_SOURCE_DIR}/runtime/AProfHooks/include
+        ${PROJECT_SOURCE_DIR}/runtime/AProfLoopArrayListHooks/include
         )
 
-add_library(AProfHooks STATIC
+add_library(AProfLoopArrayListHooks OBJECT
         ${LIB_SOURCES}
         )
 
-target_include_directories(AProfHooks
+target_include_directories(AProfLoopArrayListHooks
         PUBLIC ${LIB_INCLUDE}
         )
 
@@ -27,7 +27,7 @@ set(BINARY_SOURCES
         )
 
 # Add an executable with the above sources
-add_executable(AprofLogger ${BINARY_SOURCES})
+add_executable(AprofLoopArrayListLogger ${BINARY_SOURCES})
 
 # link the new hello_library target with the hello_binary target
-target_link_libraries(AprofLogger m rt)
+target_link_libraries(AprofLoopArrayListLogger m rt)

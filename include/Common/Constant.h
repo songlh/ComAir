@@ -18,4 +18,6 @@ enum {
 
 #define CLONE_FUNCTION_PREFIX "$aprof$"
 
+#define ARRAY_LIST_INSERT "aprof_array_list_hook"
+
 #endif //COMAIR_CONSTANT_H

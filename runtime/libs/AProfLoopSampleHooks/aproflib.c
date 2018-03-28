@@ -32,6 +32,10 @@ void aprof_init() {
 }
 
 void aprof_read(void *memory_addr, unsigned long length) {
+
+    if (pcBuffer == NULL) {
+        aprof_init();
+    }
     unsigned long start_addr = (unsigned long) memory_addr;
     if (record_log == 0) {
         if (store_stack[0].start_addr != start_addr || store_stack[0].length != length) {
@@ -56,6 +60,9 @@ void aprof_read(void *memory_addr, unsigned long length) {
 
 
 void aprof_return(unsigned long numCost, int sample) {
+    if (pcBuffer == NULL) {
+        aprof_init();
+    }
     if (record_log == 0) {
         store_stack[0].flag = 'e';
         store_stack[0].start_addr = sample;

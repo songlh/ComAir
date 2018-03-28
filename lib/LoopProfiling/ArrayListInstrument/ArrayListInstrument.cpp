@@ -70,7 +70,7 @@ void ArrayListInstrument::SetupGlobals() {
 //    assert(pModule->getGlobalVariable("numCost") == NULL);
     this->numCost = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::ExternalLinkage, 0, "numCost");
     this->numCost->setAlignment(8);
-    this->numCost->setInitializer(this->ConstantLong0);
+    this->numCost->setInitializer(this->ConstantLong1);
 
 }
 

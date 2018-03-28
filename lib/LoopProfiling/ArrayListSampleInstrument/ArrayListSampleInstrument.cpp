@@ -197,23 +197,42 @@ void ArrayListSampleInstrument::InstrumentInit(Instruction *firstInst) {
 
 }
 
-void ArrayListSampleInstrument::InstrumentReturn(Instruction *returnInst) {
-    std::vector<Value *> vecParams;
-    LoadInst *bb_pLoad = new LoadInst(this->numCost, "", false, 8, returnInst);
-    vecParams.push_back(bb_pLoad);
-    CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", returnInst);
-    void_49->setCallingConv(CallingConv::C);
-    void_49->setTailCall(false);
-    AttributeList void_PAL;
-    void_49->setAttributes(void_PAL);
+void ArrayListSampleInstrument::InstrumentReturn(Function *pFunction) {
+
+    for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            switch (Inst->getOpcode()) {
+
+                case Instruction::Ret: {
+                    std::vector<Value *> vecParams;
+                    LoadInst *bb_pLoad = new LoadInst(this->numCost, "", false, 8, Inst);
+                    vecParams.push_back(bb_pLoad);
+                    CallInst *void_49 = CallInst::Create(this->aprof_return, vecParams, "", Inst);
+                    void_49->setCallingConv(CallingConv::C);
+                    void_49->setTailCall(false);
+                    AttributeList void_PAL;
+                    void_49->setAttributes(void_PAL);
 
 
-    LoadInst *pLoad = new LoadInst(this->Switcher, "", false, 4, returnInst);
-    BinaryOperator *int32_dec = BinaryOperator::Create(
-            Instruction::Sub, pLoad,
-            this->ConstantInt1, "dec", returnInst);
+                    LoadInst *pLoad = new LoadInst(this->Switcher, "", false, 4, Inst);
+                    BinaryOperator *int32_dec = BinaryOperator::Create(
+                            Instruction::Sub, pLoad,
+                            this->ConstantInt1, "dec", Inst);
 
-    new StoreInst(int32_dec, this->Switcher, false, 4, returnInst);
+                    new StoreInst(int32_dec, this->Switcher, false, 4, Inst);
+
+                    break;
+                }
+            }
+        }
+    }
+
 }
 
 void ArrayListSampleInstrument::MarkFlag(Instruction *Inst) {
@@ -275,25 +294,6 @@ void ArrayListSampleInstrument::InstrumentHooks(Function *pFunction, Instruction
         loadInst->dump();
         type_1->dump();
         assert(false);
-
-    }
-
-    for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
-
-        BasicBlock *BB = &*BI;
-
-        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
-
-            Instruction *Inst = &*II;
-
-            switch (Inst->getOpcode()) {
-
-                case Instruction::Ret: {
-                    InstrumentReturn(Inst);
-                    break;
-                }
-            }
-        }
     }
 
 }
@@ -324,7 +324,7 @@ void ArrayListSampleInstrument::CreateIfElseIfBlock(Loop *pInnerLoop, vector<Bas
 
     //condition2
     pLoad2 = new LoadInst(this->Switcher, "", false, 4, pTerminator);
-    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_EQ, pLoad2, this->ConstantInt0, "cmp1");
+    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_SLE, pLoad2, this->ConstantInt0, "cmp1");
     pBranch = BranchInst::Create(label_geo, pHeader, pCmp);
     ReplaceInstWithInst(pTerminator, pBranch);
 
@@ -536,6 +536,8 @@ void ArrayListSampleInstrument::InstrumentInnerLoop(Loop *pInnerLoop, PostDomina
             }
         }
     }
+
+    InstrumentReturn(pFunc);
 
 }
 

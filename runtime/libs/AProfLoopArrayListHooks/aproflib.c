@@ -10,7 +10,7 @@ void *pcBuffer = NULL;
 unsigned int store_size = sizeof(struct log_address);
 
 unsigned long cache_addr = 0;
-int last_return = 0;
+int last_return = 1;
 
 // sampling
 static int old_value = -1;

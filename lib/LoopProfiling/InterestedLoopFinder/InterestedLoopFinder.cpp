@@ -252,6 +252,8 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
     loopCounterFile << "FuncID,"
                     << "LoopID,"
                     << "FuncName,"
+                    << "LoopHeader,"
+                    << "SrcLine,"
                     << "ArrayLoop 0,"
                     << "ArrayLoop 1,"
                     << "LinkedListLoop"
@@ -299,27 +301,27 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
             bool isAAL_0 = isArrayAccessLoop(loop, setArrayValue);
 
             if (isAAL_0) {
-                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
-                set<Value *>::iterator itSetBegin = setArrayValue.begin();
-                set<Value *>::iterator itSetEnd = setArrayValue.end();
-
-                while (itSetBegin != itSetEnd) {
-                    (*itSetBegin)->dump();
-                    itSetBegin++;
-                }
+//                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
+//                set<Value *>::iterator itSetBegin = setArrayValue.begin();
+//                set<Value *>::iterator itSetEnd = setArrayValue.end();
+//
+//                while (itSetBegin != itSetEnd) {
+//                    (*itSetBegin)->dump();
+//                    itSetBegin++;
+//                }
 
             }
 
             bool isAAL_1 = isArrayAccessLoop1(loop, setArrayValue);
             if (isAAL_1) {
-                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
-                set<Value *>::iterator itSetBegin = setArrayValue.begin();
-                set<Value *>::iterator itSetEnd = setArrayValue.end();
-
-                while (itSetBegin != itSetEnd) {
-                    (*itSetBegin)->dump();
-                    itSetBegin++;
-                }
+//                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
+//                set<Value *>::iterator itSetBegin = setArrayValue.begin();
+//                set<Value *>::iterator itSetEnd = setArrayValue.end();
+//
+//                while (itSetBegin != itSetEnd) {
+//                    (*itSetBegin)->dump();
+//                    itSetBegin++;
+//                }
             }
 
             // linkedList
@@ -327,15 +329,15 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
 
             bool isLLAL = isLinkedListAccessLoop(loop, setLinkedValue);
             if (isLLAL) {
-                errs() << "FOUND Linked List ACCESSING LOOP\n";
-
-                set<Value *>::iterator itSetBegin = setLinkedValue.begin();
-                set<Value *>::iterator itSetEnd = setLinkedValue.end();
-
-                while (itSetBegin != itSetEnd) {
-                    (*itSetBegin)->dump();
-                    itSetBegin++;
-                }
+//                errs() << "FOUND Linked List ACCESSING LOOP\n";
+//
+//                set<Value *>::iterator itSetBegin = setLinkedValue.begin();
+//                set<Value *>::iterator itSetEnd = setLinkedValue.end();
+//
+//                while (itSetBegin != itSetEnd) {
+//                    (*itSetBegin)->dump();
+//                    itSetBegin++;
+//                }
             }
 
             for (BasicBlock::iterator II = loop->getHeader()->begin(); II != loop->getHeader()->end(); II++) {
@@ -350,6 +352,7 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
                 loopCounterFile << std::to_string(GetFunctionID(F)) << ","
                                 << std::to_string(GetLoopID(loop)) << ","
                                 << F->getName().str() << ","
+                                << loop->getHeader()->getName().str() << ","
                                 << str << ","
                                 << isAAL_0 << ","
                                 << isAAL_1 << ","

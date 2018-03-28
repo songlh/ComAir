@@ -101,7 +101,7 @@ void read_shared_momery() {
     puts("start reading data....");
     memcpy(&Ele, ptr, sizeof(Ele));
     log_fatal("Flag,Addr,Length");
-    while (Ele.length > 0) {
+    while (Ele.start_addr > 0) {
         log_fatal("%c,%ld,%ld",
                   Ele.flag,
                   Ele.start_addr,

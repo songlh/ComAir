@@ -1,6 +1,6 @@
 add_library(ArrayListInstrumentPass MODULE
     # List your source files here.
-        ArrayListSampleInstrument.cpp
+        ArrayListInstrument.cpp
 )
 
 target_link_libraries(ArrayListInstrumentPass CommonLib SupportLib)

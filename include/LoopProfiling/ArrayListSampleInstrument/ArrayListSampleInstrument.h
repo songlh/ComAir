@@ -34,7 +34,7 @@ struct ArrayListSampleInstrument : public ModulePass {
 
     void InstrumentInit(Instruction *);
 
-    void InstrumentReturn(Instruction *returnInst);
+    void InstrumentReturn(Function *pFunc);
 
     void CreateIfElseIfBlock(Loop *pInnerLoop, vector<BasicBlock *> &vecAdded);
 

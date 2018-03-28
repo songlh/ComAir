@@ -7,7 +7,7 @@ set(LIB_INCLUDE
         ${PROJECT_SOURCE_DIR}/runtime/AProfLoopArrayListHooks/include
         )
 
-add_library(AProfLoopArrayListHooks OBJECT
+add_library(AProfLoopArrayListHooks STATIC
         ${LIB_SOURCES}
         )
 

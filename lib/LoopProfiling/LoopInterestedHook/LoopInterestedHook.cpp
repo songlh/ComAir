@@ -674,7 +674,7 @@ void LoopInterestedHook::CreateIfElseIfBlock(Loop *pInnerLoop, vector<BasicBlock
 
     //condition2
     pLoad2 = new LoadInst(this->Switcher, "", false, 4, pTerminator);
-    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_EQ, pLoad2, this->ConstantInt0, "cmp1");
+    pCmp = new ICmpInst(pTerminator, ICmpInst::ICMP_SLE, pLoad2, this->ConstantInt0, "cmp1");
     pBranch = BranchInst::Create(label_geo, pHeader, pCmp);
     ReplaceInstWithInst(pTerminator, pBranch);
 

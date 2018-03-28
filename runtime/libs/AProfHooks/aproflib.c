@@ -131,7 +131,7 @@ void aprof_insert_page_table(unsigned long addr, unsigned long count) {
 void aprof_write(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long end_addr = start_addr + 1;
+    unsigned long end_addr = start_addr + 2;
 
     for (; start_addr < end_addr; start_addr++) {
         aprof_insert_page_table(start_addr, count);
@@ -143,7 +143,7 @@ void aprof_write(void *memory_addr, unsigned long length) {
 void aprof_read(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long end_addr = start_addr + 1;
+    unsigned long end_addr = start_addr + 2;
     int j;
 
     for (; start_addr < end_addr; start_addr++) {

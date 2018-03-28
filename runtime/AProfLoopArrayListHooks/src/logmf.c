@@ -20,7 +20,7 @@ struct stack_elem {
 
 /*---- share memory ---- */
 #define BUFFERSIZE 1UL << 34
-#define APROF_MEM_LOG "/aprof_loop_arry_list_log.log"
+#define APROF_MEM_LOG "/aprof_loop_array_list_log.log"
 
 
 // logger

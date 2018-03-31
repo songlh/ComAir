@@ -143,6 +143,41 @@ bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
     set<BasicBlock *> setVisited;
 
     for (succ_iterator succ = succ_begin(pHeader); succ != succ_end(pHeader); succ++) {
+        if (BranchInst *pBranch = dyn_cast<BranchInst>((*succ)->getTerminator())) {
+            if (pBranch->isConditional()) {
+                if (PHINode *pPHI = dyn_cast<PHINode>(pBranch->getCondition())) {
+                    if (pPHI->getParent() == *succ) {
+                        if (ConstantInt *pConstant = dyn_cast<ConstantInt>(
+                                pPHI->getIncomingValue(pPHI->getBasicBlockIndex(pHeader)))) {
+                            if (pConstant->isZero()) {
+                                vecWorkList.push_back(pBranch->getSuccessor(1));
+                                setVisited.insert(pBranch->getSuccessor(1));
+
+                            } else {
+                                vecWorkList.push_back(pBranch->getSuccessor(0));
+                                setVisited.insert(pBranch->getSuccessor(0));
+                            }
+
+                            bool boolAllConstant = true;
+
+                            for (unsigned i = 0; i < pPHI->getNumIncomingValues(); i++) {
+                                if (!isa<ConstantInt>(pPHI->getIncomingValue(i))) {
+                                    boolAllConstant = false;
+                                    break;
+                                }
+                            }
+
+                            if (boolAllConstant) {
+                                setVisited.insert(*succ);
+                            }
+
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+
         if (setLoopBlocks.find(*succ) != setLoopBlocks.end()) {
             vecWorkList.push_back(*succ);
             setVisited.insert(*succ);
@@ -162,6 +197,43 @@ bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
         }
 
         for (succ_iterator succ = succ_begin(pBlock); succ != succ_end(pBlock); succ++) {
+            if (BranchInst *pBranch = dyn_cast<BranchInst>((*succ)->getTerminator())) {
+                if (pBranch->isConditional()) {
+                    if (PHINode *pPHI = dyn_cast<PHINode>(pBranch->getCondition())) {
+                        if (pPHI->getParent() == *succ) {
+
+                            if (ConstantInt *pConstant = dyn_cast<ConstantInt>(
+                                    pPHI->getIncomingValue(pPHI->getBasicBlockIndex(pBlock)))) {
+                                if (pConstant->isZero()) {
+                                    vecWorkList.push_back(pBranch->getSuccessor(1));
+                                    setVisited.insert(pBranch->getSuccessor(1));
+
+                                } else {
+                                    vecWorkList.push_back(pBranch->getSuccessor(0));
+                                    setVisited.insert(pBranch->getSuccessor(0));
+                                }
+
+                                bool boolAllConstant = true;
+
+                                for (unsigned i = 0; i < pPHI->getNumIncomingValues(); i++) {
+                                    if (!isa<ConstantInt>(pPHI->getIncomingValue(i))) {
+                                        boolAllConstant = false;
+                                        break;
+                                    }
+                                }
+
+                                if (boolAllConstant) {
+                                    setVisited.insert(*succ);
+                                }
+
+                                continue;
+                            }
+                        }
+                    }
+                }
+
+            }
+
             if (setLoopBlocks.find(*succ) != setLoopBlocks.end() && setVisited.find(*succ) == setVisited.end()) {
                 vecWorkList.push_back(*succ);
                 setVisited.insert(*succ);

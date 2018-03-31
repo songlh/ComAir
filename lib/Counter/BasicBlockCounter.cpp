@@ -10,7 +10,8 @@
 #include "llvm/IR/TypeBuilder.h"
 #include "llvm/Transforms/Utils/BasicBlockUtils.h"
 
-#include "Counter/OptimizedCounter.h"
+#include "Counter/BasicBlockCounter.h"
+#include "Common/Helper.h"
 
 using namespace std;
 
@@ -35,18 +36,6 @@ void getExitBlock(Function *pFunc, vector<BasicBlock *> &exitBlocks) {
     assert(exitBlocks.size() == 1);
 }
 
-int getExitBlockSize(Function *pFunc) {
-    int ExistBBSize = 0;
-
-    for (Function::iterator itBB = pFunc->begin(); itBB != pFunc->end(); itBB++) {
-        BasicBlock *BB = &*itBB;
-
-        if (isa<ReturnInst>(BB->getTerminator())) {
-            ExistBBSize++;
-        }
-    }
-    return ExistBBSize;
-}
 /* local function */
 
 BasicBlock *BBProfilingNode::getBlock() {

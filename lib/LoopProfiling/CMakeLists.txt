@@ -1,5 +1,5 @@
 add_subdirectory(LoopInterestedHook)
 add_subdirectory(InterestedLoopFinder)
 add_subdirectory(ArrayListSampleInstrument)
-add_subdirectory(ArrayListInstrument)
+add_subdirectory(ArrayListIterationInstrument)
 add_subdirectory(ArrayListLoopBBInstrument)

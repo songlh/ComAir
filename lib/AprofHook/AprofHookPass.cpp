@@ -213,11 +213,11 @@ void AprofHook::InstrumentInit(Instruction *firstInst) {
 
 void AprofHook::InstrumentCostUpdater(Function *pFunction, bool isOptimized) {
 
-    Instruction *pInstBefore = pFunction->getEntryBlock().getFirstNonPHI();
+    Instruction *pInstBefore = &*pFunction->getEntryBlock().getFirstInsertionPt();
 
     this->BBAllocInst = new AllocaInst(this->LongType, 0, "numCost", pInstBefore);
     this->BBAllocInst->setAlignment(8);
-    StoreInst *pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, false, pInstBefore);
+    StoreInst *pStore = new StoreInst(this->ConstantLong1, this->BBAllocInst, false, pInstBefore);
     pStore->setAlignment(8);
 
     if (isOptimized) {
@@ -237,14 +237,17 @@ void AprofHook::InstrumentCostUpdater(Function *pFunction, bool isOptimized) {
     } else {
 
         for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
+            if (BI == pFunction->begin()) {
+                continue;
+            }
             BasicBlock *pBlock = &*BI;
-            TerminatorInst *pTerminator = pBlock->getTerminator();
-            LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pTerminator);
+            Instruction *pInst = &*pBlock->getFirstInsertionPt();
+            LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pInst);
             pLoadnumCost->setAlignment(8);
             BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
                                                           this->ConstantLong1, "add",
-                                                          pTerminator);
-            StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, false, pTerminator);
+                                                          pInst);
+            StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, false, pInst);
             pStore->setAlignment(8);
         }
     }

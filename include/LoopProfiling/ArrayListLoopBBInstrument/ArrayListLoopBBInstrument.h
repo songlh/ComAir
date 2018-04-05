@@ -30,11 +30,15 @@ struct ArrayListLoopBBInstrument : public ModulePass {
 
     void InstrumentHooks(Function *, Instruction *);
 
+    void InstrumentCallBefore(Function *pFunction);
+
     void InstrumentCostUpdater(Loop *pLoop);
 
     void InstrumentInit(Instruction *);
 
-    void InstrumentReturn(Instruction *returnInst);
+    void InstrumentReturn(Function *F);
+
+    void InstrumentFinal(Function *mainFunc);
 
 
     /* Module */
@@ -49,23 +53,29 @@ struct ArrayListLoopBBInstrument : public ModulePass {
     /* ********** */
 
     /* Global Variable */
-    GlobalVariable *numCost;
+//    GlobalVariable *numCost;
     AllocaInst *itNum;
     /* ***** */
 
     /* Function */
     // int aprof_init()
     Function *aprof_init;
-    // aprof_dump(void *memory_addr, int length)
-    Function *aprof_dump;
+    // void aprof_call_before(int FuncID)
+    Function *aprof_call_before;
+    // aprof_read(void *memory_addr, int length)
+    Function *aprof_read;
     // void aprof_return(unsigned long numCost,  unsigned long itNum)
     Function *aprof_return;
+
+    Function *aprof_final;
     /* ********** */
 
     /* Constant */
     ConstantInt *ConstantLong0;
     ConstantInt *ConstantLong1;
     /* ********** */
+
+    AllocaInst *BBAllocInst;
 
 };
 

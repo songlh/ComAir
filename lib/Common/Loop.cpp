@@ -250,3 +250,54 @@ void LoopSimplify(Loop *pLoop, DominatorTree *DT) {
         }
     }
 }
+
+
+std::set<Loop *> getSubLoopSet(Loop *lp) {
+    std::set<Loop *> LoopSet;
+
+    vector<Loop *> workList;
+    if (lp != NULL) {
+        workList.push_back(lp);
+    }
+
+    while (!workList.empty()) {
+
+        Loop *loop = workList.back();
+        LoopSet.insert(loop);
+        workList.pop_back();
+
+        if (loop != nullptr && !loop->empty()) {
+
+            std::vector<Loop *> &subloopVect = lp->getSubLoopsVector();
+            if (!subloopVect.empty()) {
+                for (std::vector<Loop *>::const_iterator SI = subloopVect.begin(); SI != subloopVect.end(); SI++) {
+                    if (*SI != NULL) {
+                        if (LoopSet.find(*SI) == LoopSet.end()) {
+                            workList.push_back(*SI);
+                        }
+                    }
+                }
+
+            }
+        }
+    }
+
+    return LoopSet;
+}
+
+
+std::set<Loop *> getLoopSet(Loop *lp) {
+    std::set<Loop *> LoopSet;
+
+    if (lp != NULL && lp->getHeader() != NULL && !lp->empty()) {
+        LoopSet.insert(lp);
+        const std::vector<Loop *> &subloopVect = lp->getSubLoops();
+        if (!subloopVect.empty()) {
+            for (std::vector<Loop *>::const_iterator subli = subloopVect.begin(); subli != subloopVect.end(); subli++) {
+                Loop *subloop = *subli;
+                getLoopSet(subloop);
+            }
+        }
+    }
+    return LoopSet;
+}

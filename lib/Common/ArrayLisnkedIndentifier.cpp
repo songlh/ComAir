@@ -447,6 +447,7 @@ bool isArrayAccessLoop(Loop *pLoop, set<Value *> &setArrayValue) {
     set<Value *>::iterator itSetBegin = setPArrValue.begin();
     set<Value *>::iterator itSetEnd = setPArrValue.end();
 
+    set<Value *> setElementPtrInst;
 
     while (itSetBegin != itSetEnd) {
         set<BasicBlock *> setStoreBlocks;
@@ -462,6 +463,7 @@ bool isArrayAccessLoop(Loop *pLoop, set<Value *> &setArrayValue) {
                         if (LoadInst *pLoad = dyn_cast<LoadInst>(pGetElem->getPointerOperand())) {
                             if (pLoad->getPointerOperand() == *itSetBegin) {
                                 setStoreBlocks.insert(pStore->getParent());
+                                setElementPtrInst.insert(pGetElem);
                             }
                         }
                     }
@@ -471,14 +473,31 @@ bool isArrayAccessLoop(Loop *pLoop, set<Value *> &setArrayValue) {
 
         if (isOneStarLoop(pLoop, setStoreBlocks)) {
             // FIXME::
-            for (User *U:  (*itSetBegin)->users()) {
-                if (LoadInst *pLoad = dyn_cast<LoadInst>(U)) {
-                    if (setLoopBlocks.find(pLoad->getParent()) == setLoopBlocks.end()) {
-                        continue;
+//            for (User *U:  (*itSetBegin)->users()) {
+//                if (LoadInst *pLoad = dyn_cast<LoadInst>(U)) {
+//                    if (setLoopBlocks.find(pLoad->getParent()) == setLoopBlocks.end()) {
+//                        continue;
+//                    }
+//                    setArrayValue.insert(pLoad);
+//                }
+//            }
+
+            for (Value *elePtrInst: setElementPtrInst) {
+                for (User *u : elePtrInst->users()) {
+                    if (LoadInst *pLoad = dyn_cast<LoadInst>(u)) {
+                        if (setLoopBlocks.find(pLoad->getParent()) == setLoopBlocks.end()) {
+                            continue;
+                        }
+                        setArrayValue.insert(pLoad);
+                    } else if (StoreInst *pStore = dyn_cast<StoreInst>(u)) {
+                        if (setLoopBlocks.find(pStore->getParent()) == setLoopBlocks.end()) {
+                            continue;
+                        }
+                        setArrayValue.insert(pStore);
                     }
-                    setArrayValue.insert(pLoad);
                 }
             }
+
             //
 //            setArrayValue.insert(*itSetBegin);
         }
@@ -559,6 +578,7 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
         return false;
     }
 
+    set<Value *> setElementPtrInst;
 
     set<Value *>::iterator itSetBegin = setPLLValue.begin();
     set<Value *>::iterator itSetEnd = setPLLValue.end();
@@ -566,6 +586,7 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
     while (itSetBegin != itSetEnd) {
         set<BasicBlock *> setStoreBlocks;
         LoadInst *pLoadValue;
+        setElementPtrInst.clear();
 
         for (User *U:  (*itSetBegin)->users()) {
             if (StoreInst *pStore = dyn_cast<StoreInst>(U)) {
@@ -582,6 +603,7 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
                                         if (pLoad1->getPointerOperand() == *itSetBegin) {
                                             pLoadValue = pLoad1;
                                             setStoreBlocks.insert(pStore->getParent());
+                                            setElementPtrInst.insert(pGet);
                                         }
                                     }
                                 }
@@ -607,6 +629,7 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
                                                         if (pLoad2->getPointerOperand() == *itSetBegin) {
                                                             pLoadValue = pLoad2;
                                                             setStoreBlocks.insert(pStore->getParent());
+                                                            setElementPtrInst.insert(pGet);
                                                         }
                                                     }
                                                 }
@@ -623,7 +646,20 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
         }
 
         if (isOneStarLoop(pLoop, setStoreBlocks)) {
-            setLinkedValue.insert(pLoadValue);
+
+            // FIXME:: may be not right!!!
+            for (Value *elePtrInst: setElementPtrInst) {
+                for (User *u : elePtrInst->users()) {
+                    if (LoadInst *pLoad = dyn_cast<LoadInst>(u)) {
+                        if (setLoopBlocks.find(pLoad->getParent()) == setLoopBlocks.end()) {
+                            continue;
+                        }
+                        setLinkedValue.insert(pLoad);
+                    }
+                }
+            }
+
+//            setLinkedValue.insert(pLoadValue);
         }
 
         itSetBegin++;

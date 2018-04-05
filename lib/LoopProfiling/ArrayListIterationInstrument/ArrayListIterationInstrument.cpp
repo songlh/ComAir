@@ -12,7 +12,7 @@
 #include "llvm/Support/raw_ostream.h"
 
 
-#include "LoopProfiling/ArrayListLoopBBInstrument/ArrayListLoopBBInstrument.h"
+#include "LoopProfiling/ArrayListIterationInstrument/ArrayListIterationInstrument.h"
 #include "Common/ArrayLisnkedIndentifier.h"
 #include "Common/Helper.h"
 #include "Common/Loop.h"
@@ -22,25 +22,25 @@ using namespace llvm;
 using namespace std;
 
 
-static RegisterPass<ArrayListLoopBBInstrument> X("array-list-loop-bb-instrument",
+static RegisterPass<ArrayListIterationInstrument> X("array-list-loop-ite-instrument",
                                            "instrument a loop accessing an array element in each iteration",
                                            true, false);
 
-char ArrayListLoopBBInstrument::ID = 0;
+char ArrayListIterationInstrument::ID = 0;
 
 
 
-void ArrayListLoopBBInstrument::getAnalysisUsage(AnalysisUsage &AU) const {
+void ArrayListIterationInstrument::getAnalysisUsage(AnalysisUsage &AU) const {
     AU.setPreservesCFG();
     AU.addRequired<LoopInfoWrapperPass>();
 }
 
-ArrayListLoopBBInstrument::ArrayListLoopBBInstrument() : ModulePass(ID) {
+ArrayListIterationInstrument::ArrayListIterationInstrument() : ModulePass(ID) {
     PassRegistry &Registry = *PassRegistry::getPassRegistry();
     initializeLoopInfoWrapperPassPass(Registry);
 }
 
-void ArrayListLoopBBInstrument::SetupTypes() {
+void ArrayListIterationInstrument::SetupTypes() {
 
     this->VoidType = Type::getVoidTy(pModule->getContext());
     this->LongType = IntegerType::get(pModule->getContext(), 64);
@@ -49,14 +49,14 @@ void ArrayListLoopBBInstrument::SetupTypes() {
 
 }
 
-void ArrayListLoopBBInstrument::SetupConstants() {
+void ArrayListIterationInstrument::SetupConstants() {
 
     // long
     this->ConstantLong0 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("0"), 10));
     this->ConstantLong1 = ConstantInt::get(pModule->getContext(), APInt(64, StringRef("1"), 10));
 }
 
-void ArrayListLoopBBInstrument::SetupGlobals() {
+void ArrayListIterationInstrument::SetupGlobals() {
 //    assert(pModule->getGlobalVariable("numCost") == NULL);
 //    this->numCost = new GlobalVariable(*pModule, this->LongType, false, GlobalValue::ExternalLinkage, 0, "numCost");
 //    this->numCost->setAlignment(8);
@@ -64,7 +64,7 @@ void ArrayListLoopBBInstrument::SetupGlobals() {
 
 }
 
-void ArrayListLoopBBInstrument::SetupFunctions() {
+void ArrayListIterationInstrument::SetupFunctions() {
 
     std::vector<Type *> ArgTypes;
 
@@ -133,7 +133,7 @@ void ArrayListLoopBBInstrument::SetupFunctions() {
 
 }
 
-void ArrayListLoopBBInstrument::InstrumentInit(Instruction *firstInst) {
+void ArrayListIterationInstrument::InstrumentInit(Instruction *firstInst) {
 
     CallInst *aprof_init_call = CallInst::Create(this->aprof_init, "", firstInst);
     aprof_init_call->setCallingConv(CallingConv::C);
@@ -143,7 +143,52 @@ void ArrayListLoopBBInstrument::InstrumentInit(Instruction *firstInst) {
 
 }
 
-void ArrayListLoopBBInstrument::InstrumentReturn(Function *F) {
+void ArrayListIterationInstrument::InstrumentCostUpdater(Loop *pLoop) {
+
+    assert(pLoop != NULL);
+    Function *pFunction = pLoop->getHeader()->getParent();
+    Instruction *pInstBefore = &*pFunction->getEntryBlock().getFirstInsertionPt();
+
+    this->BBAllocInst = new AllocaInst(this->LongType, 0, "numCost", pInstBefore);
+    this->BBAllocInst->setAlignment(8);
+    StoreInst *pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, false, pInstBefore);
+    pStore->setAlignment(8);
+
+    BasicBlock *pLoopHeader = pLoop->getHeader();
+    Instruction *pInst = &*pLoopHeader->getFirstInsertionPt();
+    LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pInst);
+    pLoadnumCost->setAlignment(8);
+    BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
+                                                  this->ConstantLong1, "add",
+                                                  pInst);
+    pStore = new StoreInst(pAdd, this->BBAllocInst, false, pInst);
+    pStore->setAlignment(8);
+
+}
+
+
+void ArrayListIterationInstrument::InstrumentCallBefore(Function *F) {
+    int FuncID = GetFunctionID(F);
+    std::vector<Value *> vecParams;
+    Instruction *firstInst = &*(F->getEntryBlock().getFirstNonPHI());
+
+    ConstantInt *const_int6 = ConstantInt::get(
+            this->pModule->getContext(),
+            APInt(32, StringRef(std::to_string(FuncID)), 10));
+
+    vecParams.push_back(const_int6);
+
+    CallInst *void_46 = CallInst::Create(
+            this->aprof_call_before, vecParams, "", firstInst);
+    void_46->setCallingConv(CallingConv::C);
+    void_46->setTailCall(false);
+    AttributeList void_PAL;
+    void_46->setAttributes(void_PAL);
+
+}
+
+
+void ArrayListIterationInstrument::InstrumentReturn(Function *F) {
 
     for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
 
@@ -172,78 +217,7 @@ void ArrayListLoopBBInstrument::InstrumentReturn(Function *F) {
 
 }
 
-void ArrayListLoopBBInstrument::InstrumentFinal(Function *mainFunc) {
-
-    for (Function::iterator BI = mainFunc->begin(); BI != mainFunc->end(); BI++) {
-
-        BasicBlock *BB = &*BI;
-
-        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
-
-            Instruction *Inst = &*II;
-
-            switch (Inst->getOpcode()) {
-                case Instruction::Ret: {
-                    std::vector<Value *> vecParams;
-                    CallInst *void_49 = CallInst::Create(this->aprof_final, vecParams, "", Inst);
-                    void_49->setCallingConv(CallingConv::C);
-                    void_49->setTailCall(false);
-                    AttributeList void_PAL;
-                    void_49->setAttributes(void_PAL);
-                }
-            }
-        }
-    }
-
-}
-
-void ArrayListLoopBBInstrument::InstrumentCostUpdater(Loop *pLoop) {
-    Function *pFunction = pLoop->getHeader()->getParent();
-    Instruction *pInstBefore = &*pFunction->getEntryBlock().getFirstInsertionPt();
-
-    this->BBAllocInst = new AllocaInst(this->LongType, 0, "NumCost", pInstBefore);
-    this->BBAllocInst->setAlignment(8);
-    StoreInst *pStore = new StoreInst(this->ConstantLong0, this->BBAllocInst, false, pInstBefore);
-    pStore->setAlignment(8);
-
-   for(Loop::block_iterator BB = pLoop->block_begin(); BB != pLoop->block_end(); BB++) {
-        BasicBlock *pBlock = *BB;
-        Instruction *pInst = &*pBlock->getFirstInsertionPt();
-        LoadInst *pLoadnumCost = new LoadInst(this->BBAllocInst, "", false, pInst);
-        pLoadnumCost->setAlignment(8);
-        BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
-                                                      this->ConstantLong1, "add",
-                                                      pInst);
-        StoreInst *pStore = new StoreInst(pAdd, this->BBAllocInst, false, pInst);
-        pStore->setAlignment(8);
-
-    }
-
-}
-
-
-void ArrayListLoopBBInstrument::InstrumentCallBefore(Function *F) {
-    int FuncID = GetFunctionID(F);
-    std::vector<Value *> vecParams;
-    Instruction *firstInst = &*(F->getEntryBlock().getFirstNonPHI());
-
-    ConstantInt *const_int6 = ConstantInt::get(
-            this->pModule->getContext(),
-            APInt(32, StringRef(std::to_string(FuncID)), 10));
-
-    vecParams.push_back(const_int6);
-
-    CallInst *void_46 = CallInst::Create(
-            this->aprof_call_before, vecParams, "", firstInst);
-    void_46->setCallingConv(CallingConv::C);
-    void_46->setTailCall(false);
-    AttributeList void_PAL;
-    void_46->setAttributes(void_PAL);
-
-}
-
-
-void ArrayListLoopBBInstrument::InstrumentHooks(Function *pFunction, Instruction *pInst) {
+void ArrayListIterationInstrument::InstrumentHooks(Function *pFunction, Instruction *pInst) {
 
     Value *var = pInst->getOperand(0);
 
@@ -276,7 +250,32 @@ void ArrayListLoopBBInstrument::InstrumentHooks(Function *pFunction, Instruction
 
 }
 
-void ArrayListLoopBBInstrument::SetupInit(Module &M) {
+void ArrayListIterationInstrument::InstrumentFinal(Function *mainFunc) {
+
+    for (Function::iterator BI = mainFunc->begin(); BI != mainFunc->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            switch (Inst->getOpcode()) {
+                case Instruction::Ret: {
+                    std::vector<Value *> vecParams;
+                    CallInst *void_49 = CallInst::Create(this->aprof_final, vecParams, "", Inst);
+                    void_49->setCallingConv(CallingConv::C);
+                    void_49->setTailCall(false);
+                    AttributeList void_PAL;
+                    void_49->setAttributes(void_PAL);
+                }
+            }
+        }
+    }
+
+}
+
+void ArrayListIterationInstrument::SetupInit(Module &M) {
     // all set up operation
     this->pModule = &M;
     SetupTypes();
@@ -287,7 +286,7 @@ void ArrayListLoopBBInstrument::SetupInit(Module &M) {
 }
 
 
-bool ArrayListLoopBBInstrument::runOnModule(Module &M) {
+bool ArrayListIterationInstrument::runOnModule(Module &M) {
 
     SetupInit(M);
     std::set<Loop *> LoopSet;

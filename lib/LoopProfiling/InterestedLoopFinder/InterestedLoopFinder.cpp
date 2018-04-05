@@ -9,6 +9,7 @@
 #include "llvm/IR/Module.h"
 
 #include "Common/Helper.h"
+#include "Common/Loop.h"
 #include "LoopProfiling/InterestedLoopFinder/InterestedLoopFinder.h"
 #include "Common/ArrayLisnkedIndentifier.h"
 
@@ -24,55 +25,7 @@ static cl::opt<std::string> strFileName(
         cl::desc("The name of File to store system library"), cl::Optional,
         cl::value_desc("strFileName"));
 
-string funcName = "";
-
-/* local */
-std::set<Loop *> LoopSet; /*Set storing loop and subloop */
-
-
-void getSubLoopSet(Loop *lp) {
-
-    vector<Loop *> workList;
-    if (lp != NULL) {
-        workList.push_back(lp);
-    }
-
-    while (workList.size() != 0) {
-
-        Loop *loop = workList.back();
-        LoopSet.insert(loop);
-        workList.pop_back();
-
-        if (loop != nullptr && !loop->empty()) {
-
-            std::vector<Loop *> &subloopVect = lp->getSubLoopsVector();
-            if (subloopVect.size() != 0) {
-                for (std::vector<Loop *>::const_iterator SI = subloopVect.begin(); SI != subloopVect.end(); SI++) {
-                    if (*SI != NULL) {
-                        if (LoopSet.find(*SI) == LoopSet.end()) {
-                            workList.push_back(*SI);
-                        }
-                    }
-                }
-
-            }
-        }
-    }
-}
-
-void getLoopSet(Loop *lp) {
-    if (lp != NULL && lp->getHeader() != NULL && !lp->empty()) {
-        LoopSet.insert(lp);
-        const std::vector<Loop *> &subloopVect = lp->getSubLoops();
-        if (!subloopVect.empty()) {
-            for (std::vector<Loop *>::const_iterator subli = subloopVect.begin(); subli != subloopVect.end(); subli++) {
-                Loop *subloop = *subli;
-                getLoopSet(subloop);
-            }
-        }
-    }
-}
-
+string funcName = "songlh_strlen";
 
 /* end local */
 
@@ -241,6 +194,7 @@ void InterestedLoopFinder::InstrumentInit(Instruction *firstInst) {
 bool InterestedLoopFinder::runOnModule(Module &M) {
     // setup init
     SetupInit(&M);
+    std::set<Loop *> LoopSet;
 
     if (strFileName.empty()) {
         errs() << "Please set file name!" << "\n";
@@ -282,7 +236,8 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
 
         for (auto &loop:LoopInfo) {
             //LoopSet.insert(loop);
-            getSubLoopSet(loop); //including the loop itself
+            std::set<Loop *> tempLoopSet = getSubLoopSet(loop); //including the loop itself
+            LoopSet.insert(tempLoopSet.begin(), tempLoopSet.end());
         }
 
         if (LoopSet.empty()) {
@@ -301,27 +256,27 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
             bool isAAL_0 = isArrayAccessLoop(loop, setArrayValue);
 
             if (isAAL_0) {
-//                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
-//                set<Value *>::iterator itSetBegin = setArrayValue.begin();
-//                set<Value *>::iterator itSetEnd = setArrayValue.end();
-//
-//                while (itSetBegin != itSetEnd) {
-//                    (*itSetBegin)->dump();
-//                    itSetBegin++;
-//                }
+                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
+                set<Value *>::iterator itSetBegin = setArrayValue.begin();
+                set<Value *>::iterator itSetEnd = setArrayValue.end();
+
+                while (itSetBegin != itSetEnd) {
+                    (*itSetBegin)->dump();
+                    itSetBegin++;
+                }
 
             }
 
             bool isAAL_1 = isArrayAccessLoop1(loop, setArrayValue);
             if (isAAL_1) {
-//                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
-//                set<Value *>::iterator itSetBegin = setArrayValue.begin();
-//                set<Value *>::iterator itSetEnd = setArrayValue.end();
-//
-//                while (itSetBegin != itSetEnd) {
-//                    (*itSetBegin)->dump();
-//                    itSetBegin++;
-//                }
+                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
+                set<Value *>::iterator itSetBegin = setArrayValue.begin();
+                set<Value *>::iterator itSetEnd = setArrayValue.end();
+
+                while (itSetBegin != itSetEnd) {
+                    (*itSetBegin)->dump();
+                    itSetBegin++;
+                }
             }
 
             // linkedList
@@ -329,15 +284,15 @@ bool InterestedLoopFinder::runOnModule(Module &M) {
 
             bool isLLAL = isLinkedListAccessLoop(loop, setLinkedValue);
             if (isLLAL) {
-//                errs() << "FOUND Linked List ACCESSING LOOP\n";
-//
-//                set<Value *>::iterator itSetBegin = setLinkedValue.begin();
-//                set<Value *>::iterator itSetEnd = setLinkedValue.end();
-//
-//                while (itSetBegin != itSetEnd) {
-//                    (*itSetBegin)->dump();
-//                    itSetBegin++;
-//                }
+                errs() << "FOUND Linked List ACCESSING LOOP\n";
+
+                set<Value *>::iterator itSetBegin = setLinkedValue.begin();
+                set<Value *>::iterator itSetEnd = setLinkedValue.end();
+
+                while (itSetBegin != itSetEnd) {
+                    (*itSetBegin)->dump();
+                    itSetBegin++;
+                }
             }
 
             for (BasicBlock::iterator II = loop->getHeader()->begin(); II != loop->getHeader()->end(); II++) {

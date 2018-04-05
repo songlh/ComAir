@@ -264,9 +264,9 @@ void ArrayListSampleInstrument::RemapInstruction(Instruction *I, ValueToValueMap
     }
 }
 
-void ArrayListSampleInstrument::InstrumentHooks(Function *pFunction, Instruction *loadInst) {
+void ArrayListSampleInstrument::InstrumentHooks(Function *pFunction, Instruction *pInst) {
 
-    Value *var = loadInst->getOperand(0);
+    Value *var = pInst->getOperand(0);
     DataLayout *dl = new DataLayout(this->pModule);
     Type *type_1 = var->getType()->getContainedType(0);
 
@@ -279,11 +279,11 @@ void ArrayListSampleInstrument::InstrumentHooks(Function *pFunction, Instruction
                 APInt(32, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
 
         CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
-                                           "", loadInst);
+                                           "", pInst);
         std::vector<Value *> void_51_params;
         void_51_params.push_back(ptr_50);
         void_51_params.push_back(const_int6);
-        CallInst *void_51 = CallInst::Create(this->aprof_dump, void_51_params, "", loadInst);
+        CallInst *void_51 = CallInst::Create(this->aprof_dump, void_51_params, "", pInst);
         void_51->setCallingConv(CallingConv::C);
         void_51->setTailCall(false);
         AttributeList void_PAL;
@@ -291,7 +291,7 @@ void ArrayListSampleInstrument::InstrumentHooks(Function *pFunction, Instruction
 
     } else {
 
-        loadInst->dump();
+        pInst->dump();
         type_1->dump();
         assert(false);
     }
@@ -571,7 +571,7 @@ bool ArrayListSampleInstrument::runOnModule(Module &M) {
 
     set<Value *> setArrayValue;
 
-    LoadInst *ploadInst = NULL;
+    Instruction *pInst = NULL;
 
     if (isArrayAccessLoop(pLoop, setArrayValue)) {
         errs() << "\nFOUND ARRAY 0 ACCESSING LOOP\n";
@@ -581,9 +581,9 @@ bool ArrayListSampleInstrument::runOnModule(Module &M) {
 
         while (itSetBegin != itSetEnd) {
             (*itSetBegin)->dump();
-            ploadInst = dyn_cast<LoadInst>(*itSetBegin);
+            pInst = dyn_cast<Instruction>(*itSetBegin);
             itSetBegin++;
-            MarkFlag(ploadInst);
+            MarkFlag(pInst);
         }
 
     } else if (isArrayAccessLoop1(pLoop, setArrayValue)) {
@@ -594,9 +594,9 @@ bool ArrayListSampleInstrument::runOnModule(Module &M) {
 
         while (itSetBegin != itSetEnd) {
             (*itSetBegin)->dump();
-            ploadInst = dyn_cast<LoadInst>(*itSetBegin);
+            pInst = dyn_cast<Instruction>(*itSetBegin);
             itSetBegin++;
-            MarkFlag(ploadInst);
+            MarkFlag(pInst);
         }
     }
 
@@ -610,13 +610,13 @@ bool ArrayListSampleInstrument::runOnModule(Module &M) {
 
         while (itSetBegin != itSetEnd) {
             (*itSetBegin)->dump();
-            ploadInst = dyn_cast<LoadInst>(*itSetBegin);
+            pInst = dyn_cast<Instruction>(*itSetBegin);
             itSetBegin++;
-            MarkFlag(ploadInst);
+            MarkFlag(pInst);
         }
     }
 
-    if (ploadInst == NULL) {
+    if (pInst == NULL) {
         errs() << "Could not find Array or LinkedList in target Function!" << "\n";
         exit(0);
     }

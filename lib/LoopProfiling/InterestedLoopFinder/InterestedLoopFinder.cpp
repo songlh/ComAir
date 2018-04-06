@@ -25,7 +25,7 @@ static cl::opt<std::string> strFileName(
         cl::desc("The name of File to store system library"), cl::Optional,
         cl::value_desc("strFileName"));
 
-string funcName = "songlh_strlen";
+string funcName = "";
 
 /* end local */
 

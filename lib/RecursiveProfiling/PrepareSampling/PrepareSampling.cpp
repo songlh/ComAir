@@ -27,7 +27,7 @@ static RegisterPass<PrepareSampling> X(
         "prepare for sampling", true, true);
 
 
-static cl::opt<int> SamplingRate("sample-rate",
+static cl::opt<int> SamplingRate("sampleRate",
                                  cl::desc("The rate of sampling."),
                                  cl::init(100));
 
@@ -480,16 +480,14 @@ void PrepareSampling::AddSwitcher(Function *F) {
     pLoad1 = new LoadInst(this->Switcher, "", false, newEntry);
     pLoad1->setAlignment(4);
 
-    // create if (switcher == 0)
-    pCmp = new ICmpInst(*newEntry, ICmpInst::ICMP_EQ, pLoad1, this->ConstantInt0, "");
+    // create if (switcher <= 0)
+    pCmp = new ICmpInst(*newEntry, ICmpInst::ICMP_SLE, pLoad1, this->ConstantInt0, "");
     BranchInst::Create(label_if_then, label_if_else, pCmp, newEntry);
 
     // collect all args to pass to newF and rawF.
     vector<Value *> callArgs;
     for (Function::arg_iterator k = F->arg_begin(), ke = F->arg_end(); k != ke; ++k)
         callArgs.push_back(k);
-
-
 
     // call geo random a int num and store to switcher
     pLoad1 = new LoadInst(this->GeoRate, "", false, label_if_then);
@@ -659,7 +657,7 @@ bool PrepareSampling::runOnModule(Module &M) {
     }
 
     /* ---- change clone function callees ---- */
-    CloneFunctionCalled();
+//    CloneFunctionCalled();
     /* ---- end ---- */
 
     return false;

@@ -13,16 +13,12 @@
 #include <assert.h>
 
 
-struct stack_elem {
-    int funcId; // function id
-    unsigned long ts; // time stamp
-    unsigned long rms;
-    unsigned long cost;
-};
+// array size
+#define STACK_SIZE 20000
 
 /*---- share memory ---- */
 #define BUFFERSIZE 1UL << 34
-#define APROF_MEM_LOG "/aprof_recu_log.log"
+#define APROF_MEM_LOG "/aprof_counter_log.log"
 
 
 // logger
@@ -97,22 +93,25 @@ void read_shared_momery() {
 
     void *ptr = mmap(NULL, BUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_NORESERVE, fd, 0);
 
-    struct stack_elem Ele;
-    int size_of_ele = sizeof(Ele);
+    long long recursiveFunc[STACK_SIZE] = {0};
+    long long LoopFunc[STACK_SIZE]={0};
+
+    int sizeOffset = sizeof(long long) * STACK_SIZE;
 
     puts("start reading data....");
-    memcpy(&Ele, ptr, sizeof(Ele));
-    log_fatal("funcId,rms,cost");
-    while (Ele.funcId > 0) {
-        log_fatal("%d,%ld,%ld",
-                  Ele.funcId,
-                  Ele.rms,
-                  Ele.cost
-        );
-        ptr += size_of_ele;
-        memcpy(&Ele, ptr, size_of_ele);
-    }
+    memcpy(&(recursiveFunc), ptr, sizeOffset);
+    log_fatal("id,cost");
 
+    for (int i = 0; i < STACK_SIZE; i++) {
+        log_fatal("%d,%ld",i,recursiveFunc[i]);
+    }
+    ptr += sizeOffset;
+
+    memcpy(&(LoopFunc), ptr, sizeOffset);
+
+    for (int i = 0; i < STACK_SIZE; i++) {
+        log_fatal("%d,%ld", i,LoopFunc[i]);
+    }
     puts("read over");
     shm_unlink(APROF_MEM_LOG);
     close(fd);

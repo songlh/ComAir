@@ -38,4 +38,6 @@ std::string printSrcCodeInfo(Instruction *pInst);
 
 std::string getFileNameForInstruction(Instruction *pInst);
 
+std::string getClonedFunctionName(Module *M, std::string FuncName);
+
 #endif //COMAIR_HELPER_H

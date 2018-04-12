@@ -15,42 +15,42 @@
 
 
 /* ---- page table ---- */
-/* ---- page table ---- */
-
-#define PAGE_SIZE     4096
-#define L0_TABLE_SIZE 16
-#define L1_TABLE_SIZE 512
-#define L3_TABLE_SIZE 1024
-
-#define L0_MASK  0xF0000000
-#define L1_MASK  0xFF80000
-#define L2_MASK  0x7FC00
-#define L3_MASK  0x3FF
-
-#define NEG_L3_MASK 0xFFFFFC00
 #define STACK_SIZE 2000
 /*---- end ----*/
 
 /*---- share memory ---- */
 #define BUFFERSIZE (unsigned long) 1UL << 34
-#define APROF_MEM_LOG "/aprof_loop_array_list_log.log"
+#define APROF_MEM_LOG "/aprof_loop_log.log"
 
 /*---- end ----*/
 
 /*---- run time lib api ----*/
 
 struct log_address {
-    unsigned long  numCost;
-    int  length;
+    unsigned long  start_addr;
+    unsigned long  length;
+    char flag; // r -> read; w->write, e->return, o->outer return, i ->loop_in, x->loop_out
 };
 
 void aprof_init();
 
-void aprof_call_in();
+void aprof_write(void *memory_addr, unsigned long length);
 
-void aprof_dump(void *memory_addr, int length);
+void aprof_read(void *memory_addr, unsigned long length);
 
-void aprof_return(unsigned long numCost);
+void aprof_return(unsigned long numCost, int sample);
+
+void aprof_loop_in(int funcId, int loopId);
+
+void aprof_loop_out(int funcId, int loopId);
+
+/*---- sampling generator ----*/
+
+//===========================================================================
+//=  Function to generate geometrically distributed random variables        =
+//=    - Input:  Probability of success p                                   =
+//=    - Output: Returns with geometrically distributed random variable     =
+//===========================================================================
 
 int aprof_geo(int iRate);            // Returns a geometric random variable
 

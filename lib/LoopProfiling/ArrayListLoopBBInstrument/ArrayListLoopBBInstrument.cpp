@@ -341,7 +341,6 @@ bool ArrayListLoopBBInstrument::runOnModule(Module &M) {
                     itSetBegin++;
                     InstrumentHooks(F, pInst);
                 }
-
             }
 
             bool isAAL_1 = isArrayAccessLoop1(loop, setArrayValue);

@@ -1,7 +1,7 @@
 add_library(CounterPass MODULE
     # List your source files here.
         BasicBlockCounter.cpp
-        RecursiveFunctionCounter.cpp
+        LoopRecursiveCounter.cpp
 )
 
 target_link_libraries(CounterPass CommonLib)

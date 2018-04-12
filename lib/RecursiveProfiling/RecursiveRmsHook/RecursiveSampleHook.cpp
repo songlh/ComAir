@@ -4,8 +4,10 @@
 #include "llvm/IR/DebugInfo.h"
 
 #include "RecursiveProfiling/RecursiveRmsHook/RecursiveRmsHook.h"
+#include "Common/Constant.h"
 #include "Common/Helper.h"
 #include "Support/BBProfiling.h"
+
 
 using namespace llvm;
 using namespace std;
@@ -109,18 +111,19 @@ void RecursiveRmsHook::SetupFunctions() {
         ArgTypes.clear();
     }
 
-    // aprof_return(int funcID, long numCost)
-    this->aprof_call_in = this->pModule->getFunction("aprof_call_in");
-//    assert(this->aprof_return != NULL);
+    // aprof_call_before
+    this->aprof_call_before = this->pModule->getFunction("aprof_call_before");
+//    assert(this->aprof_call_before != NULL);
 
-    if (!this->aprof_call_in) {
+    if (!this->aprof_call_before) {
         ArgTypes.push_back(this->IntType);
-        ArgTypes.push_back(this->LongType);
-        FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
-        this->aprof_call_in = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_call_in",
-                                               this->pModule);
-        this->aprof_call_in->setCallingConv(CallingConv::C);
+        //ArgTypes.push_back(this->LongType);
+        FunctionType *AprofCallBeforeType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_call_before = Function::Create(AprofCallBeforeType, GlobalValue::ExternalLinkage,
+                                                   "aprof_call_before", this->pModule);
+        this->aprof_call_before->setCallingConv(CallingConv::C);
         ArgTypes.clear();
+
     }
 
     // aprof_read
@@ -134,6 +137,32 @@ void RecursiveRmsHook::SetupFunctions() {
         FunctionType *AprofReadType = FunctionType::get(this->VoidType, ArgTypes, false);
         this->aprof_read = Function::Create(AprofReadType, GlobalValue::ExternalLinkage, "aprof_read", this->pModule);
         this->aprof_read->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
+
+    // aprof_write
+    this->aprof_write = this->pModule->getFunction("aprof_write");
+//    assert(this->aprof_write != NULL);
+
+    if (!this->aprof_write) {
+        ArgTypes.push_back(this->VoidPointerType);
+        ArgTypes.push_back(this->LongType);
+        FunctionType *AprofWriteType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_write = Function::Create(AprofWriteType, GlobalValue::ExternalLinkage, "aprof_write",
+                                             this->pModule);
+        this->aprof_write->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
+
+    // aprof_increment_rms
+    this->aprof_increment_rms = this->pModule->getFunction("aprof_increment_rms");
+//    assert(this->aprof_increment_rms != NULL);
+
+    if (!this->aprof_increment_rms) {
+        ArgTypes.push_back(this->LongType);
+        FunctionType *AprofIncrementRmsType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_increment_rms = Function::Create(AprofIncrementRmsType, GlobalValue::ExternalLinkage,
+                                                     "aprof_increment_rms", this->pModule);
         ArgTypes.clear();
     }
 
@@ -151,6 +180,56 @@ void RecursiveRmsHook::SetupFunctions() {
         ArgTypes.clear();
     }
 
+    // aprof_final
+    this->aprof_final = this->pModule->getFunction("aprof_final");
+//    assert(this->aprof_return != NULL);
+
+    if (!this->aprof_final) {
+        //ArgTypes.push_back(this->LongType);
+        FunctionType *AprofReturnType = FunctionType::get(this->VoidType, ArgTypes, false);
+        this->aprof_final = Function::Create(AprofReturnType, GlobalValue::ExternalLinkage, "aprof_final",
+                                             this->pModule);
+        this->aprof_final->setCallingConv(CallingConv::C);
+        ArgTypes.clear();
+    }
+
+}
+
+void RecursiveRmsHook::InstrumentWrite(StoreInst *pStore, Instruction *BeforeInst) {
+
+    Value *var = pStore->getOperand(1);
+
+    DataLayout *dl = new DataLayout(this->pModule);
+    Type *type_1 = var->getType()->getContainedType(0);
+
+//    while (isa<PointerType>(type_1))
+//        type_1 = type_1->getContainedType(0);
+
+    if (type_1->isSized()) {
+
+        ConstantInt *const_int6 = ConstantInt::get(
+                this->pModule->getContext(),
+                APInt(64, StringRef(std::to_string(dl->getTypeAllocSize(type_1))), 10));
+
+        CastInst *ptr_50 = new BitCastInst(var, this->VoidPointerType,
+                                           "", BeforeInst);
+        std::vector<Value *> void_51_params;
+        void_51_params.push_back(ptr_50);
+        void_51_params.push_back(const_int6);
+        CallInst *void_51 = CallInst::Create(this->aprof_write, void_51_params, "", BeforeInst);
+        void_51->setCallingConv(CallingConv::C);
+        void_51->setTailCall(false);
+        AttributeList void_PAL;
+        void_51->setAttributes(void_PAL);
+
+    } else {
+
+        pStore->dump();
+        type_1->dump();
+        assert(false);
+
+    }
+
 }
 
 void RecursiveRmsHook::InstrumentInit(Instruction *firstInst) {
@@ -165,29 +244,23 @@ void RecursiveRmsHook::InstrumentInit(Instruction *firstInst) {
 
 void RecursiveRmsHook::InstrumentCallBefore(Function *F) {
 
-    for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+    Instruction *FirstInst = &*(F->getEntryBlock().getFirstInsertionPt());
 
-        BasicBlock *EntryBB = &*BI;
-        Instruction *FirstInst = &*(EntryBB->getFirstInsertionPt());
-        //  temp alloc
-        LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, 8, FirstInst);
-        int FuncID = GetFunctionID(F);
+    int FuncID = GetFunctionID(F);
 
-        ConstantInt *const_funId = ConstantInt::get(
-                this->pModule->getContext(),
-                APInt(32, StringRef(std::to_string(FuncID)), 10));
+    ConstantInt *const_funId = ConstantInt::get(
+            this->pModule->getContext(),
+            APInt(32, StringRef(std::to_string(FuncID)), 10));
 
-        // call aprof_call_in
-        std::vector<Value *> vecParams;
-        vecParams.push_back(const_funId);
-        vecParams.push_back(pLoadnumCost);
-        CallInst *void_49 = CallInst::Create(this->aprof_call_in, vecParams, "", FirstInst);
-        void_49->setCallingConv(CallingConv::C);
-        void_49->setTailCall(false);
-        AttributeList void_PAL;
-        void_49->setAttributes(void_PAL);
-        break;
-    }
+    // call aprof_call_before
+    std::vector<Value *> vecParams;
+    vecParams.push_back(const_funId);
+    CallInst *void_49 = CallInst::Create(this->aprof_call_before, vecParams, "", FirstInst);
+    void_49->setCallingConv(CallingConv::C);
+    void_49->setTailCall(false);
+    AttributeList void_PAL;
+    void_49->setAttributes(void_PAL);
+
 }
 
 void RecursiveRmsHook::InstrumentReturn(Instruction *BeforeInst) {
@@ -257,10 +330,10 @@ void RecursiveRmsHook::InstrumentHooks(Function *Func) {
 
     assert(FuncID > 0);
 
-    //bool need_update_rms = false;
-
     // be carefull, there must be this order!
-//    InstrumentCallBefore(Func);
+    InstrumentCallBefore(Func);
+    InstrumentRmsUpdater(Func);
+    InstrumentUpdater(Func);
 
     for (Function::iterator BI = Func->begin(); BI != Func->end(); BI++) {
 
@@ -282,6 +355,13 @@ void RecursiveRmsHook::InstrumentHooks(Function *Func) {
                     break;
                 }
 
+                case Instruction::Store: {
+                    if (StoreInst *pStore = dyn_cast<StoreInst>(Inst)) {
+                        InstrumentWrite(pStore, Inst);
+                    }
+                    break;
+                }
+
                 case Instruction::Ret: {
                     InstrumentReturn(Inst);
                     break;
@@ -291,21 +371,76 @@ void RecursiveRmsHook::InstrumentHooks(Function *Func) {
     }
 }
 
+
+void RecursiveRmsHook::InstrumentFinal(Function *mainFunc) {
+
+    for (Function::iterator BI = mainFunc->begin(); BI != mainFunc->end(); BI++) {
+
+        BasicBlock *BB = &*BI;
+
+        for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+
+            Instruction *Inst = &*II;
+
+            switch (Inst->getOpcode()) {
+                case Instruction::Ret: {
+                    std::vector<Value *> vecParams;
+                    CallInst *void_49 = CallInst::Create(this->aprof_final, vecParams, "", Inst);
+                    void_49->setCallingConv(CallingConv::C);
+                    void_49->setTailCall(false);
+                    AttributeList void_PAL;
+                    void_49->setAttributes(void_PAL);
+                }
+            }
+        }
+    }
+
+}
+
+void RecursiveRmsHook::InstrumentRmsUpdater(Function *F) {
+
+    if (F->arg_size() > 0) {
+        DataLayout *dl = new DataLayout(this->pModule);
+        int add_rms = 0;
+        for (Function::arg_iterator argIt = F->arg_begin(); argIt != F->arg_end(); argIt++) {
+            Argument *argument = argIt;
+
+            Type *argType = argument->getType();
+            add_rms += dl->getTypeAllocSize(argType);
+        }
+
+        Instruction *II = &*(F->getEntryBlock().getFirstInsertionPt());
+
+        AllocaInst *temAllocInst = new AllocaInst(this->LongType, 0, "tempAlloc", II);
+        CastInst *ptr_50 = new BitCastInst(temAllocInst, this->VoidPointerType,
+                                           "");
+        ptr_50->insertAfter(II);
+
+        std::vector<Value *> vecParams;
+        ConstantInt *const_rms = ConstantInt::get(
+                this->pModule->getContext(),
+                APInt(64, StringRef(std::to_string(add_rms)), 10));
+        vecParams.push_back(ptr_50);
+        vecParams.push_back(const_rms);
+        CallInst *void_49 = CallInst::Create(this->aprof_read,
+                                             vecParams, "");
+        void_49->insertAfter(ptr_50);
+        void_49->setCallingConv(CallingConv::C);
+        void_49->setTailCall(false);
+        AttributeList void_PAL;
+        void_49->setAttributes(void_PAL);
+    }
+
+}
+
 void RecursiveRmsHook::InstrumentUpdater(Function *pFunction) {
 
-    for (Function::iterator BI = pFunction->begin(); BI != pFunction->end(); BI++) {
-
-        BasicBlock *EntryBB = &*BI;
-        Instruction *FirstInst = &*(EntryBB->getFirstInsertionPt());
-
-        //  temp alloc
-        LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, 8, FirstInst);
-        BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
-                                                      this->ConstantLong1, "add",
-                                                      FirstInst);
-        new StoreInst(pAdd, this->numCost, false, 8, FirstInst);
-        break;
-    }
+    Instruction *FirstInst = &*(pFunction->getEntryBlock().getFirstInsertionPt());
+    LoadInst *pLoadnumCost = new LoadInst(this->numCost, "", false, 8, FirstInst);
+    BinaryOperator *pAdd = BinaryOperator::Create(Instruction::Add, pLoadnumCost,
+                                                  this->ConstantLong1, "add",
+                                                  FirstInst);
+    new StoreInst(pAdd, this->numCost, false, 8, FirstInst);
 
 }
 
@@ -320,9 +455,6 @@ void RecursiveRmsHook::SetupInit() {
 
 void RecursiveRmsHook::SetupHooks() {
 
-    // init all global and constants variables
-    SetupInit();
-
     if (!strFuncName.empty()) {
         Function *Func = this->pModule->getFunction(strFuncName);
 
@@ -331,22 +463,11 @@ void RecursiveRmsHook::SetupHooks() {
             exit(0);
         }
 
-        InstrumentUpdater(Func);
     }
 
     for (Module::iterator FI = this->pModule->begin(); FI != this->pModule->end(); FI++) {
 
         Function *Func = &*FI;
-
-        if (isSampling == 1) {
-
-            if (!IsClonedFunc(Func)) {
-                continue;
-            }
-
-        } else if (IsIgnoreFunc(Func)) {
-            continue;
-        }
 
         if (!IsRecursiveCall(Func)) {
             continue;
@@ -366,8 +487,57 @@ void RecursiveRmsHook::SetupHooks() {
     if (MainFunc) {
 
         //Instruction *firstInst = &*(MainFunc->begin()->begin());
-        Instruction *firstInst = MainFunc->getEntryBlock().getFirstNonPHI();
+        Instruction *firstInst = &*MainFunc->getEntryBlock().getFirstInsertionPt();
         InstrumentInit(firstInst);
+        InstrumentFinal(MainFunc);
+
+        // this is make sure main function has call before,
+        // so the shadow stack will not empty in running.
+    }
+}
+
+void RecursiveRmsHook::SetupSampleRecursiveHooks() {
+
+
+    if (strFuncName.empty()) {
+        errs() << "Please set recursive function name." << "\n";
+        exit(0);
+    }
+
+    Function *Func = this->pModule->getFunction(strFuncName);
+
+    if (!Func || !IsRecursiveCall(Func)) {
+        errs() << "could not find target recursive function." << "\n";
+        exit(0);
+    }
+
+    string new_name = Func->getName().str();
+    new_name = CLONE_FUNCTION_PREFIX + new_name;
+
+    Function *NewFunc = this->pModule->getFunction(new_name);
+
+    if (!NewFunc) {
+        errs() << "could not find cloned recursive function." << "\n";
+        exit(0);
+    }
+
+
+    if (this->funNameIDFile)
+        this->funNameIDFile << strFuncName
+                            << ":" << GetFunctionID(Func) << "\n";
+
+    InstrumentHooks(NewFunc);
+
+
+    Function *MainFunc = this->pModule->getFunction("main");
+    assert(MainFunc != NULL);
+
+    if (MainFunc) {
+
+        //Instruction *firstInst = &*(MainFunc->begin()->begin());
+        Instruction *firstInst = &*MainFunc->getEntryBlock().getFirstInsertionPt();
+        InstrumentInit(firstInst);
+        InstrumentFinal(MainFunc);
 
         // this is make sure main function has call before,
         // so the shadow stack will not empty in running.
@@ -409,7 +579,17 @@ bool RecursiveRmsHook::runOnModule(Module &M) {
     }
 
     this->pModule = &M;
-    SetupHooks();
+
+    SetupInit();
+
+    if (isSampling) {
+
+        SetupSampleRecursiveHooks();
+
+    } else {
+
+        SetupHooks();
+    }
 
     return true;
 }

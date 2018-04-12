@@ -1,6 +1,21 @@
 #include "aproflib.h"
 
 // page table
+// page table
+// L0  28-31
+// L1  19-27
+// L2  10-18
+// L3   0-9
+
+void **pL0 = NULL;
+void **pL1 = NULL;
+void **pL2 = NULL;
+
+unsigned long *pL3 = NULL;
+
+unsigned long prev = 0;
+unsigned long *prev_pL3 = NULL;
+
 
 struct log_address store_stack[1];
 
@@ -29,6 +44,86 @@ void aprof_init() {
         ftruncate(fd, BUFFERSIZE);
 
     pcBuffer = (void *) mmap(0, BUFFERSIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+
+}
+
+unsigned long aprof_query_page_table(unsigned long addr) {
+
+    if ((addr & NEG_L3_MASK) == prev) {
+        return prev_pL3[addr & L3_MASK];
+    }
+
+    unsigned long tmp = (addr & L0_MASK) >> 28;
+
+    if (pL0[tmp] == NULL) {
+        return 0;
+    }
+
+    pL1 = (void **) pL0[tmp];
+
+    tmp = (addr & L1_MASK) >> 19;
+
+    if (pL1[tmp] == NULL) {
+        return 0;
+    }
+
+    pL2 = (void **) pL1[tmp];
+
+    tmp = (addr & L2_MASK) >> 10;
+
+    if (pL2[tmp] == NULL) {
+        return 0;
+    }
+
+    pL3 = (unsigned long *) pL2[tmp];
+
+    prev = addr & NEG_L3_MASK;
+    prev_pL3 = pL3;
+
+    return pL3[addr & L3_MASK];
+}
+
+
+void aprof_insert_page_table(unsigned long addr, unsigned long count) {
+
+    if ((addr & NEG_L3_MASK) == prev) {
+        prev_pL3[addr & L3_MASK] = count;
+        return;
+    }
+
+
+    unsigned long tmp = (addr & L0_MASK) >> 28;
+
+    if (pL0[tmp] == NULL) {
+        pL0[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
+        memset(pL0[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
+    }
+
+    pL1 = (void **) pL0[tmp];
+
+    tmp = (addr & L1_MASK) >> 19;
+
+    if (pL1[tmp] == NULL) {
+
+        pL1[tmp] = (void **) malloc(sizeof(void *) * L1_TABLE_SIZE);
+        memset(pL1[tmp], 0, sizeof(void *) * L1_TABLE_SIZE);
+    }
+
+    pL2 = (void **) pL1[tmp];
+
+    tmp = (addr & L2_MASK) >> 10;
+
+    if (pL2[tmp] == NULL) {
+        pL2[tmp] = (unsigned long *) malloc(sizeof(unsigned long) * L3_TABLE_SIZE);
+        memset(pL2[tmp], 0, sizeof(unsigned long) * L3_TABLE_SIZE);
+    }
+
+    pL3 = (unsigned long *) pL2[tmp];
+
+    prev = addr & NEG_L3_MASK;
+    prev_pL3 = pL3;
+
+    pL3[addr & L3_MASK] = count;
 
 }
 

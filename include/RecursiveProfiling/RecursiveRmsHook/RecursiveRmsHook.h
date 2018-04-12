@@ -41,17 +41,25 @@ struct RecursiveRmsHook : public ModulePass {
 
     void SetupHooks();
 
+    void SetupSampleRecursiveHooks();
+
     void InstrumentInit(Instruction *);
 
     void InstrumentRead(LoadInst *, Instruction *);
+
+    void InstrumentWrite(StoreInst *, Instruction *);
 
     void InstrumentHooks(Function *);
 
     void InstrumentCallBefore(Function *pFunction);
 
-    void InstrumentReturn(Instruction *m);
+    void InstrumentRmsUpdater(Function *F);
 
     void InstrumentUpdater(Function *pFunction);
+
+    void InstrumentReturn(Instruction *);
+
+    void InstrumentFinal(Function *);
 
     /* Module */
     Module *pModule;
@@ -67,12 +75,22 @@ struct RecursiveRmsHook : public ModulePass {
     /* Function */
     // int aprof_init()
     Function *aprof_init;
-    // void aprof_read(void *memory_addr, unsigned long length)
+    // void aprof_increment_cost()
+    Function *aprof_increment_cost;
+    // void aprof_increment_rms
+    Function *aprof_increment_rms;
+    // void aprof_increment_rms
+    Function *aprof_increment_rms_for_args;
+    // void aprof_write(void *memory_addr, unsigned int length)
+    Function *aprof_write;
+    // void aprof_read(void *memory_addr, unsigned int length)
     Function *aprof_read;
     // void aprof_call_before(char *funcName)
-    Function *aprof_call_in;
+    Function *aprof_call_before;
     // void aprof_return()
     Function *aprof_return;
+    // void aprof_final()
+    Function *aprof_final;
     /* ********** */
 
     /* Constant */

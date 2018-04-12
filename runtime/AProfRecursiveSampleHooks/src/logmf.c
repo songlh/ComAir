@@ -12,17 +12,15 @@
 #include <unistd.h>
 #include <assert.h>
 
-
 struct stack_elem {
-    int funcId; // function id
-    unsigned long ts; // time stamp
-    unsigned long rms;
-    unsigned long cost;
+    unsigned long  start_addr;
+    unsigned long  length;
+    char flag; // r -> read; w->write, e->return
 };
 
 /*---- share memory ---- */
 #define BUFFERSIZE 1UL << 34
-#define APROF_MEM_LOG "/aprof_recu_log.log"
+#define APROF_MEM_LOG "/aprof_rs_log.log"
 
 
 // logger
@@ -102,12 +100,12 @@ void read_shared_momery() {
 
     puts("start reading data....");
     memcpy(&Ele, ptr, sizeof(Ele));
-    log_fatal("funcId,rms,cost");
-    while (Ele.funcId > 0) {
-        log_fatal("%d,%ld,%ld",
-                  Ele.funcId,
-                  Ele.rms,
-                  Ele.cost
+    log_fatal("Flag,Addr,Length");
+    while (Ele.length > 0) {
+        log_fatal("%c,%ld,%ld",
+                  Ele.flag,
+                  Ele.start_addr,
+                  Ele.length
         );
         ptr += size_of_ele;
         memcpy(&Ele, ptr, size_of_ele);
@@ -121,10 +119,12 @@ void read_shared_momery() {
 
 int main() {
 
-    char FILENAME[] = "aprof_logger_XXXXXX";
+    char FILENAME[] = "aprof_re_sample_logger_XXXXXX";
     int fd;
     fd = mkstemp(FILENAME);
     assert(fd > 0);
+//    strcat(FILENAME, ".txt");
+
 
     int QUIET = 1;
     FILE *fp = fopen(FILENAME, "w");

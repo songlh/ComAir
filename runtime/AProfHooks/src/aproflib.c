@@ -193,7 +193,6 @@ void aprof_call_before(int funcId) {
 void aprof_return(unsigned long numCost) {
 
     shadow_stack[stack_top].cost += numCost;
-
     memcpy(pcBuffer, &(shadow_stack[stack_top]), struct_size);
     pcBuffer += struct_size;
     shadow_stack[stack_top - 1].rms += shadow_stack[stack_top].rms;

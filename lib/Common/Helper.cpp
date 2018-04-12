@@ -366,3 +366,25 @@ std::string printSrcCodeInfo(Instruction *pInst) {
     return sFileName + ": " + std::to_string(numLine);
 
 }
+
+
+std::string getClonedFunctionName(Module *M, std::string FuncName) {
+
+    unsigned long nameLength = FuncName.length();
+
+    for (Module::iterator FI = M->begin(); FI != M->end(); FI++) {
+        Function *Func = &*FI;
+
+        std::string func_name = Func->getName().str();
+        if (func_name.length() > 7 &&
+                func_name.substr(0, 7) == CLONE_FUNCTION_PREFIX) {
+            if (func_name.substr(7, nameLength) == FuncName) {
+                return func_name;
+            }
+        }
+    }
+
+
+
+    return NULL;
+}

@@ -84,11 +84,13 @@ unsigned long aprof_query_page_table(unsigned long addr) {
 }
 
 
-void aprof_insert_page_table(unsigned long addr, unsigned long count) {
+unsigned long aprof_query_insert_page_table(unsigned long addr, unsigned long count) {
 
+    unsigned long pre_value = 0;
     if ((addr & NEG_L3_MASK) == prev) {
+        pre_value = prev_pL3[addr & L3_MASK];
         prev_pL3[addr & L3_MASK] = count;
-        return;
+        return pre_value;
     }
 
 
@@ -122,8 +124,9 @@ void aprof_insert_page_table(unsigned long addr, unsigned long count) {
 
     prev = addr & NEG_L3_MASK;
     prev_pL3 = pL3;
-
+    pre_value = prev_pL3[addr & L3_MASK];
     pL3[addr & L3_MASK] = count;
+    return  pre_value;
 
 }
 
@@ -131,10 +134,10 @@ void aprof_insert_page_table(unsigned long addr, unsigned long count) {
 void aprof_write(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long end_addr = start_addr + 2;
+    unsigned long end_addr = start_addr + length;
 
     for (; start_addr < end_addr; start_addr++) {
-        aprof_insert_page_table(start_addr, count);
+        aprof_query_insert_page_table(start_addr, count);
     }
 
 }
@@ -143,14 +146,14 @@ void aprof_write(void *memory_addr, unsigned long length) {
 void aprof_read(void *memory_addr, unsigned long length) {
 
     unsigned long start_addr = (unsigned long) memory_addr;
-    unsigned long end_addr = start_addr + 2;
+    unsigned long end_addr = start_addr + length;
     int j;
 
     for (; start_addr < end_addr; start_addr++) {
 
         // We assume that w has been wrote before reading.
         // ts[w] > 0 and ts[w] < S[top]
-        unsigned long ts_w = aprof_query_page_table(start_addr);
+        unsigned long ts_w = aprof_query_insert_page_table(start_addr, count);
         if (ts_w < shadow_stack[stack_top].ts) {
 
             shadow_stack[stack_top].rms++;
@@ -166,7 +169,7 @@ void aprof_read(void *memory_addr, unsigned long length) {
             }
         }
 
-        aprof_insert_page_table(start_addr, count);
+//        aprof_insert_page_table(start_addr, count);
     }
 
 }

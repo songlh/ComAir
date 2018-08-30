@@ -3,7 +3,7 @@ add_library(CommonLib STATIC
         Helper.cpp
         Search.cpp
         Loop.cpp
-        ArrayLisnkedIndentifier.cpp
+        ArrayLinkedIndentifier.cpp
         )
 
 # Use C++11 to compile our pass (i.e., supply -std=c++11).

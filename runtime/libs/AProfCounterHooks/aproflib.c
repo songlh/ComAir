@@ -1,10 +1,10 @@
 #include "aproflib.h"
 
 
-int recursiveFunc[STACK_SIZE] = {0};
-int LoopFunc[STACK_SIZE]={0};
+long long recursiveFunc[STACK_SIZE] = {0};
+long long LoopFunc[STACK_SIZE]={0};
 
-int sizeOffset = sizeof(int) * STACK_SIZE;
+int sizeOffset = sizeof(long long) * STACK_SIZE;
 
 // share memory
 int fd;

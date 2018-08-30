@@ -22,7 +22,7 @@
 
 
 #include "LoopProfiling/ArrayListSampleInstrument/ArrayListSampleInstrument.h"
-#include "Common/ArrayLisnkedIndentifier.h"
+#include "Common/ArrayLinkedIndentifier.h"
 #include "Common/Constant.h"
 #include "Common/Loop.h"
 

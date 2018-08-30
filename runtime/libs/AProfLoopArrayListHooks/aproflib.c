@@ -35,7 +35,7 @@ void aprof_init() {
 void aprof_dump(void *memory_addr, int length) {
     unsigned long addr = (unsigned long) memory_addr;
 //    if (cache_addr != addr) {
-        store_stack[0].numCost = (unsigned long) memory_addr;
+        store_stack[0].numCost = addr;
         store_stack[0].length = length;
         memcpy(pcBuffer, &(store_stack), store_size);
         pcBuffer += store_size;
@@ -45,7 +45,7 @@ void aprof_dump(void *memory_addr, int length) {
 }
 
 void aprof_return(unsigned long numCost) {
-    if (last_return != 1) {
+    if (last_return == 0) {
         store_stack[0].numCost = numCost;
         store_stack[0].length = 0;
         memcpy(pcBuffer, &(store_stack), store_size);

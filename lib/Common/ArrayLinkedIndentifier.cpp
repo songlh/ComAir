@@ -1,5 +1,5 @@
-#ifndef COMAIR_ARRAYLISNKEDINDENTIFIER_H
-#define COMAIR_ARRAYLISNKEDINDENTIFIER_H
+#ifndef COMAIR_ARRAYLINKEDINDENTIFIER_H
+#define COMAIR_ARRAYLINKEDINDENTIFIER_H
 
 #include <set>
 
@@ -127,9 +127,15 @@ Loop *searchLoopByLineNo(Function *pFunction, LoopInfo *pLI, unsigned uLineNo) {
 
 bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
     BasicBlock *pHeader = pLoop->getHeader();
+    BasicBlock *fakePHeader = pHeader;
 
     if (setBlocks.find(pHeader) != setBlocks.end()) {
         return true;
+    }
+
+    if (!pHeader->getUniquePredecessor()) {
+        // it may be built with  O2
+        fakePHeader = pLoop->getLoopPredecessor();
     }
 
     set<BasicBlock *> setLoopBlocks;
@@ -188,7 +194,7 @@ bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
         BasicBlock *pBlock = vecWorkList.back();
         vecWorkList.pop_back();
 
-        if (pBlock == pHeader) {
+        if (pBlock == fakePHeader) {
             return false;
         }
 
@@ -247,10 +253,19 @@ bool isOneStarLoop(Loop *pLoop, set<BasicBlock *> &setBlocks) {
 bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
     map<Value *, vector<LoadInst *> > mapPArrValueAccess;
     set<BasicBlock *> setLoopBlocks;
+    set<BasicBlock *> setLoopBlocksWithPre;
 
     for (Loop::block_iterator BB = pLoop->block_begin(); BB != pLoop->block_end(); BB++) {
         BasicBlock *B = *BB;
         setLoopBlocks.insert(B);
+        setLoopBlocksWithPre.insert(B);
+    }
+
+    // for -O2
+    BasicBlock *pHeader = pLoop->getHeader();
+    if (!pHeader->getUniquePredecessor()) {
+        BasicBlock *loopPre = pLoop->getLoopPredecessor();
+        setLoopBlocksWithPre.insert(loopPre);
     }
 
     for (Loop::block_iterator BB = pLoop->block_begin(); BB != pLoop->block_end(); BB++) {
@@ -259,14 +274,14 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
         for (BasicBlock::iterator II = B->begin(); II != B->end(); II++) {
             if (LoadInst *pLoad = dyn_cast<LoadInst>(&*II)) {
                 if (GetElementPtrInst *pSource = dyn_cast<GetElementPtrInst>(pLoad->getPointerOperand())) {
-                    if (setLoopBlocks.find(pSource->getParent()) == setLoopBlocks.end()) {
+                    if (setLoopBlocksWithPre.find(pSource->getParent()) == setLoopBlocksWithPre.end()) {
                         continue;
                     }
 
                     Value *vArrayValue = pSource->getPointerOperand();
                     mapPArrValueAccess[vArrayValue].push_back(pLoad);
 
-                    //vArrayValue->dump();
+//                    vArrayValue->dump();
                 }
             }
         }
@@ -300,7 +315,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
     if (setPArrValue.size() == 0) {
         return false;
     }
-
+    errs() << setPArrValue.size() << "\n";
 
     set<Value *>::iterator itSetBegin = setPArrValue.begin();
     set<Value *>::iterator itSetEnd = setPArrValue.end();
@@ -313,7 +328,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
 
         for (User *U:  (*itSetBegin)->users()) {
             if (GetElementPtrInst *pGet = dyn_cast<GetElementPtrInst>(U)) {
-                if (setLoopBlocks.find(pGet->getParent()) == setLoopBlocks.end()) {
+                if (setLoopBlocksWithPre.find(pGet->getParent()) == setLoopBlocksWithPre.end()) {
                     continue;
                 }
 
@@ -326,11 +341,12 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
                 while (CastInst *pCast = dyn_cast<CastInst>(vOffset)) {
                     vOffset = pCast->getOperand(0);
                 }
+//                vOffset->dump();
 
                 if (LoadInst *pLoad = dyn_cast<LoadInst>(vOffset)) {
                     for (User *UOffset : pLoad->getOperand(0)->users()) {
                         if (StoreInst *pStore = dyn_cast<StoreInst>(UOffset)) {
-                            if (setLoopBlocks.find(pStore->getParent()) != setLoopBlocks.end()) {
+                            if (setLoopBlocksWithPre.find(pStore->getParent()) != setLoopBlocksWithPre.end()) {
                                 setStoreBlocks.insert(pStore->getParent());
                                 setElementPtrInst.insert(pGet);
                             }
@@ -338,11 +354,39 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
                     }
                 } else if (OverflowingBinaryOperator *op = dyn_cast<OverflowingBinaryOperator>(vOffset)) {
                     Value *firstVal = op->getOperand(0);
+                    firstVal->dump();
                     if (LoadInst *pLoad = dyn_cast<LoadInst>(firstVal)) {
                         for (User *UOffset : pLoad->getOperand(0)->users()) {
                             if (StoreInst *pStore = dyn_cast<StoreInst>(UOffset)) {
-                                if (setLoopBlocks.find(pStore->getParent()) != setLoopBlocks.end()) {
+                                if (setLoopBlocksWithPre.find(pStore->getParent()) != setLoopBlocksWithPre.end()) {
                                     setStoreBlocks.insert(pStore->getParent());
+                                    setElementPtrInst.insert(pGet);
+                                }
+                            }
+                        }
+                    }
+
+                    else if (PHINode *pPHI = dyn_cast<PHINode>(firstVal)) {
+                        for (unsigned i = 0; i < pPHI->getNumIncomingValues(); i++) {
+                            if (!isa<ConstantInt>(pPHI->getIncomingValue(i))) {
+                                if (BinaryOperator *op2 = dyn_cast<BinaryOperator>(pPHI->getIncomingValue(i))) {
+                                    Value *firstVal2 = op2->getOperand(0);
+
+                                    if (firstVal2 == pPHI) {
+                                        setElementPtrInst.insert(pGet);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                } else if (PHINode *pPHI = dyn_cast<PHINode>(vOffset)) {
+                    for (unsigned i = 0; i < pPHI->getNumIncomingValues(); i++) {
+                        if (!isa<ConstantInt>(pPHI->getIncomingValue(i))) {
+                            if (BinaryOperator *op = dyn_cast<BinaryOperator>(pPHI->getIncomingValue(i))) {
+                                Value *firstVal = op->getOperand(0);
+
+                                if (firstVal == pPHI) {
                                     setElementPtrInst.insert(pGet);
                                 }
                             }
@@ -351,7 +395,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
                 }
             }
         }
-
+//        errs() << setElementPtrInst.size() << "\n";
         if (isOneStarLoop(pLoop, setStoreBlocks)) {
             // FIXME::
             for (Value *elePtrInst: setElementPtrInst) {
@@ -370,7 +414,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
 
         itSetBegin++;
     }
-
+//    errs() << setArrayValue.size() << "\n";
     if (setArrayValue.size() > 0) {
         return true;
     }
@@ -520,6 +564,10 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
         BasicBlock *B = *BB;
         setLoopBlocks.insert(B);
     }
+
+    // for -O2
+    BasicBlock *loopPre = pLoop->getLoopPredecessor();
+    setLoopBlocks.insert(loopPre);
 
     for (Loop::block_iterator BB = pLoop->block_begin(); BB != pLoop->block_end(); BB++) {
         BasicBlock *B = *BB;
@@ -672,4 +720,4 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
     return false;
 }
 
-#endif //COMAIR_ARRAYLISNKEDINDENTIFIER_H
+#endif //COMAIR_ARRAYLINKEDINDENTIFIER_H

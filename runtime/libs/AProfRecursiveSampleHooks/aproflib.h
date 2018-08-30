@@ -20,7 +20,7 @@
 
 /*---- share memory ---- */
 #define BUFFERSIZE (unsigned long) 1UL << 34
-#define APROF_MEM_LOG "/aprof_loop_log.log"
+#define APROF_MEM_LOG "/aprof_rs_log.log"
 
 /*---- end ----*/
 
@@ -39,10 +39,6 @@ void aprof_write(void *memory_addr, unsigned long length);
 void aprof_read(void *memory_addr, unsigned long length);
 
 void aprof_return(unsigned long numCost, int sample);
-
-void aprof_loop_in(int funcId, int loopId);
-
-void aprof_loop_out(int funcId, int loopId);
 
 /*---- sampling generator ----*/
 

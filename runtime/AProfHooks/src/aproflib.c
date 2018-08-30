@@ -208,6 +208,8 @@ void aprof_final() {
     // free malloc memory
     int i, j, k;
 
+    int count = 0;
+
     for (i = 0; i < L0_TABLE_SIZE; i++) {
         if (pL0[i] == NULL) {
             continue;
@@ -225,6 +227,8 @@ void aprof_final() {
             for (k = 0; k < L1_TABLE_SIZE; k++) {
                 if (pL2[k] != NULL) {
                     free(pL2[k]);
+                } else {
+                    count++;
                 }
             }
 
@@ -235,4 +239,6 @@ void aprof_final() {
     }
 
     free(pL0);
+
+    printf(" total byte is : %d\n", count);
 }

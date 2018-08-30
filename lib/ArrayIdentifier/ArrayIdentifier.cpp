@@ -13,7 +13,7 @@
 
 
 #include "ArrayIdentifier/ArrayIdentifier.h"
-#include "Common/ArrayLisnkedIndentifier.h"
+#include "Common/ArrayLinkedIndentifier.h"
 
 
 using namespace std;

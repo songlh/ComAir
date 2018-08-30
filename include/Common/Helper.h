@@ -36,6 +36,8 @@ bool IsRecursiveCall(Function *F);
 
 std::string printSrcCodeInfo(Instruction *pInst);
 
+std::string printSrcCodeInfo(Function *F);
+
 std::string getFileNameForInstruction(Instruction *pInst);
 
 std::string getClonedFunctionName(Module *M, std::string FuncName);

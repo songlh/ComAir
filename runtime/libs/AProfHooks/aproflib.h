@@ -34,7 +34,7 @@ void aprof_init_page_table();
 
 unsigned long aprof_query_page_table(unsigned long address);
 
-void aprof_insert_page_table(unsigned long start_addr, unsigned long count);
+unsigned long aprof_query_insert_page_table(unsigned long start_addr, unsigned long count);
 
 /*---- end ----*/
 

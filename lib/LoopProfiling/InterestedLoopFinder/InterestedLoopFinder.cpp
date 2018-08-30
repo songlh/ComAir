@@ -11,7 +11,7 @@
 #include "Common/Helper.h"
 #include "Common/Loop.h"
 #include "LoopProfiling/InterestedLoopFinder/InterestedLoopFinder.h"
-#include "Common/ArrayLisnkedIndentifier.h"
+#include "Common/ArrayLinkedIndentifier.h"
 
 using namespace std;
 

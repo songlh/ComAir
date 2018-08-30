@@ -33,6 +33,7 @@ void aprof_init() {
 
 void aprof_read(void *memory_addr, unsigned long length) {
     unsigned long start_addr = (unsigned long) memory_addr;
+
     if (record_log == 0) {
         if (store_stack[0].start_addr != start_addr || store_stack[0].length != length) {
             store_stack[0].flag = 'r';
@@ -56,36 +57,16 @@ void aprof_read(void *memory_addr, unsigned long length) {
 
 
 void aprof_return(unsigned long numCost, int sample) {
-    if (record_log == 0) {
-        store_stack[0].flag = 'e';
-        store_stack[0].start_addr = sample;
-        // carefull !!!
-        store_stack[0].length = numCost;
-        memcpy(pcBuffer, &(store_stack), store_size);
-        pcBuffer += store_size;
-        record_log = 1;
-    }
-}
 
-void aprof_loop_in(int funcId, int loopId) {
-    store_stack[0].flag = 'i';
-    store_stack[0].start_addr = funcId;
+//        printf("%ld\n", numCost);
+    store_stack[0].flag = 'e';
+    store_stack[0].start_addr = sample;
     // carefull !!!
-    store_stack[0].length = loopId;
+    store_stack[0].length = numCost;
     memcpy(pcBuffer, &(store_stack), store_size);
     pcBuffer += store_size;
+    record_log = 1;
 }
-
-
-void aprof_loop_out(int funcId, int loopId) {
-    store_stack[0].flag = 'x';
-    store_stack[0].start_addr = funcId;
-    // carefull !!!
-    store_stack[0].length = loopId;
-    memcpy(pcBuffer, &(store_stack), store_size);
-    pcBuffer += store_size;
-}
-
 
 static double aprof_rand_val(int seed) {
     const long a = 16807;  // Multiplier

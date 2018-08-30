@@ -156,7 +156,6 @@ void LoopRecursiveCounter::InstrumentDump(Instruction *Inst) {
 }
 
 
-
 bool LoopRecursiveCounter::runOnModule(Module &M) {
 
     this->pModule = &M;
@@ -173,7 +172,8 @@ bool LoopRecursiveCounter::runOnModule(Module &M) {
     storeFile << "FuncID,"
               << "LoopID,"
               << "FuncName,"
-              << "LoopOrRecursive"
+              << "LoopOrRecursive,"
+              << "Src"
               << "\n";
 
     std::set<Loop *> LoopSet;
@@ -188,8 +188,8 @@ bool LoopRecursiveCounter::runOnModule(Module &M) {
         if (IsRecursiveCall(F)) {
             InstrumentRecursiveFunc(F);
             storeFile << std::to_string(GetFunctionID(F)) << ","
-                            << "0" << "," << F->getName().str()
-                            << ","<< "R" << "\n";
+                      << "0" << "," << F->getName().str()
+                      << "," << "R" << "," << printSrcCodeInfo(F) << "\n";
         }
 
 
@@ -219,7 +219,7 @@ bool LoopRecursiveCounter::runOnModule(Module &M) {
             InstrumentLoop(loop);
             storeFile << std::to_string(GetFunctionID(F)) << ","
                       << std::to_string(GetLoopID(loop)) <<
-                      "," << F->getName().str() << "," << "L" << "\n";
+                      "," << F->getName().str() << "," << "L" << "," << printSrcCodeInfo(F) << "\n";
         }
     }
 
@@ -241,7 +241,7 @@ bool LoopRecursiveCounter::runOnModule(Module &M) {
 
                 switch (Inst->getOpcode()) {
                     case Instruction::Ret: {
-                       InstrumentDump(Inst);
+                        InstrumentDump(Inst);
                     }
                 }
             }

@@ -367,6 +367,24 @@ std::string printSrcCodeInfo(Instruction *pInst) {
 
 }
 
+std::string printSrcCodeInfo(Function *F) {
+    if (F) {
+        for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+
+            BasicBlock *BB = &*BI;
+            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+                Instruction *Inst = &*II;
+
+                std::string SrcCode = printSrcCodeInfo(Inst);
+                if (SrcCode != "") {
+                    return SrcCode;
+                }
+            }
+        }
+    }
+    return "null";
+}
+
 
 std::string getClonedFunctionName(Module *M, std::string FuncName) {
 
@@ -383,8 +401,6 @@ std::string getClonedFunctionName(Module *M, std::string FuncName) {
             }
         }
     }
-
-
 
     return NULL;
 }

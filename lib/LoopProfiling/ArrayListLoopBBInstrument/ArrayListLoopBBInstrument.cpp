@@ -13,7 +13,7 @@
 
 
 #include "LoopProfiling/ArrayListLoopBBInstrument/ArrayListLoopBBInstrument.h"
-#include "Common/ArrayLisnkedIndentifier.h"
+#include "Common/ArrayLinkedIndentifier.h"
 #include "Common/Helper.h"
 #include "Common/Loop.h"
 
@@ -331,7 +331,7 @@ bool ArrayListLoopBBInstrument::runOnModule(Module &M) {
             Instruction *pInst = NULL;
 
             if (isAAL_0) {
-//                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
+                errs() << "FOUND ARRAY 0 ACCESSING LOOP\n";
                 set<Value *>::iterator itSetBegin = setArrayValue.begin();
                 set<Value *>::iterator itSetEnd = setArrayValue.end();
 
@@ -345,7 +345,7 @@ bool ArrayListLoopBBInstrument::runOnModule(Module &M) {
 
             bool isAAL_1 = isArrayAccessLoop1(loop, setArrayValue);
             if (isAAL_1) {
-//                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
+                errs() << "FOUND ARRAY 1 ACCESSING LOOP\n";
                 set<Value *>::iterator itSetBegin = setArrayValue.begin();
                 set<Value *>::iterator itSetEnd = setArrayValue.end();
 
@@ -363,7 +363,7 @@ bool ArrayListLoopBBInstrument::runOnModule(Module &M) {
 
             bool isLLAL = isLinkedListAccessLoop(loop, setLinkedValue);
             if (isLLAL) {
-//                errs() << "FOUND Linked List ACCESSING LOOP\n";
+                errs() << "FOUND Linked List ACCESSING LOOP\n";
                 set<Value *>::iterator itSetBegin = setLinkedValue.begin();
                 set<Value *>::iterator itSetEnd = setLinkedValue.end();
 

@@ -4,6 +4,8 @@ cd ./AProfHooks && make clean &&  make
 
 cd ../AProfCounterHooks && make clean &&  make
 
+cd ../AProfDumpCallStack/ && make clean &&  make
+
 cd ../AProfLoopArrayListHooks/ && make clean &&  make
 
 cd ../AProfLoopSampleHooks/ && make clean &&  make

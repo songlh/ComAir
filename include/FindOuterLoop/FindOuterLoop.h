@@ -1,7 +1,3 @@
-//
-// Created by tzt77 on 8/29/18.
-//
-
 #ifndef COMAIR_FINDOUTERLOOP_H
 #define COMAIR_FINDOUTERLOOP_H
 

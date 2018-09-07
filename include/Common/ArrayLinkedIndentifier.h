@@ -27,4 +27,6 @@ bool isArrayAccessLoop(Loop *pLoop, set<Value *> &setArrayValue);
 
 bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue);
 
+void findArrayIndexAndData(Instruction *Inst);
+
 #endif //COMAIR_ARRAYLISNKEDINDENTIFIER_H

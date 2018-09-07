@@ -119,16 +119,26 @@ void FindOuterLoop::Execute(std::map<std::string, long> FuncNameCostMap) {
                             } else {
                                 Value *callPointer = cs.getCalledValue();
                                 Function *targetFunc = getTargetFunctionName(callPointer);
+                                Value* sv = callPointer->stripPointerCasts();
+//                                StringRef fname = sv->getName();
+
                                 if (targetFunc) {
                                     string targetFuncName = targetFunc->getName();
                                     if (FuncNameCostMap.find(targetFuncName) != FuncNameCostMap.end()) {
                                         if (CurrentMaxCost > FuncNameCostMap[targetFuncName])
                                             currentCallees.insert(callee);
                                     }
+                                } else if (dyn_cast<Function>(callPointer->stripPointerCasts())) {
+                                    callee = dyn_cast<Function>(callPointer->stripPointerCasts());
+                                    string calleeName = callee->getName();
+                                    if (FuncNameCostMap.find(calleeName) != FuncNameCostMap.end()) {
+                                        if (CurrentMaxCost > FuncNameCostMap[calleeName])
+                                            currentCallees.insert(callee);
+                                    }
                                 } else {
-
-                                    errs() << " Could not find callee! " << "\n";
+                                    errs() << " Could not find callee, in function:" << FuncName << "\n";
                                     Inst->dump();
+
                                 }
                             }
                         }

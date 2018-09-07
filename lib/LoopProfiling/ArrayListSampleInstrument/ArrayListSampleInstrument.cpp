@@ -582,6 +582,7 @@ bool ArrayListSampleInstrument::runOnModule(Module &M) {
         while (itSetBegin != itSetEnd) {
             (*itSetBegin)->dump();
             pInst = dyn_cast<Instruction>(*itSetBegin);
+            findArrayIndexAndData(pInst);
             itSetBegin++;
             MarkFlag(pInst);
         }
@@ -595,6 +596,7 @@ bool ArrayListSampleInstrument::runOnModule(Module &M) {
         while (itSetBegin != itSetEnd) {
             (*itSetBegin)->dump();
             pInst = dyn_cast<Instruction>(*itSetBegin);
+            findArrayIndexAndData(pInst);
             itSetBegin++;
             MarkFlag(pInst);
         }

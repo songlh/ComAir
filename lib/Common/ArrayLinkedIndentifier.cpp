@@ -364,9 +364,7 @@ bool isArrayAccessLoop1(Loop *pLoop, set<Value *> &setArrayValue) {
                                 }
                             }
                         }
-                    }
-
-                    else if (PHINode *pPHI = dyn_cast<PHINode>(firstVal)) {
+                    } else if (PHINode *pPHI = dyn_cast<PHINode>(firstVal)) {
                         for (unsigned i = 0; i < pPHI->getNumIncomingValues(); i++) {
                             if (!isa<ConstantInt>(pPHI->getIncomingValue(i))) {
                                 if (BinaryOperator *op2 = dyn_cast<BinaryOperator>(pPHI->getIncomingValue(i))) {
@@ -718,6 +716,66 @@ bool isLinkedListAccessLoop(Loop *pLoop, set<Value *> &setLinkedValue) {
     }
 
     return false;
+}
+
+
+void findArrayIndexAndData(Instruction *Inst) {
+    // array 1
+    if (LoadInst *loadInst = dyn_cast<LoadInst>(Inst)) {
+
+        Value *Op1 = loadInst->getOperand(0);
+        if (GetElementPtrInst *getPtr = dyn_cast<GetElementPtrInst>(Op1)) {
+
+            Value *data = getPtr->getOperand(0);
+            Value *index = getPtr->getOperand(1);
+
+            Instruction *IndexInst = dyn_cast<Instruction>(index);
+
+            // find index
+            if (IndexInst->getOpcode() == Instruction::SExt) {
+
+                SExtInst *sExtInst = dyn_cast<SExtInst>(index);
+                Value *indexPre = sExtInst->getOperand(0);
+                Instruction *indexInst = dyn_cast<Instruction>(indexPre);
+
+                if (indexInst->getNumOperands() == 1) {
+
+                    errs() << "Find index instruction :" << "\n";
+                    indexPre->dump();
+
+                } else {
+
+                    Value *v1 = indexInst->getOperand(0);
+                    Value *v2 = indexInst->getOperand(1);
+                    if (ConstantInt *contInst = dyn_cast<ConstantInt>(v2)) {
+                        errs() << "Find index instruction :" << "\n";
+                        v1->dump();
+                    }
+                }
+
+            } else {
+                errs() << "index instruction is not first situation:" << "\n";
+            }
+
+            // find data
+            if (LoadInst *dataLoad = dyn_cast<LoadInst>(data)) {
+
+                errs() << "Find data instruction :" << "\n";
+                dataLoad->dump();
+
+            } else {
+                errs() << "index instruction is not first situation:" << "\n";
+            }
+
+        }
+    } else if (StoreInst *storeInst = dyn_cast<StoreInst>(Inst)) {
+        // array 0
+        Value *src = storeInst->getOperand(1);
+        if (AllocaInst *allocSrc = dyn_cast<AllocaInst>(src)) {
+            errs() << "Find src instruction :" << "\n";
+            allocSrc->dump();
+        }
+    }
 }
 
 #endif //COMAIR_ARRAYLINKEDINDENTIFIER_H

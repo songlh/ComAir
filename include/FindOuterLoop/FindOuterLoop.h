@@ -23,8 +23,15 @@ struct FindOuterLoop : public ModulePass {
     virtual bool runOnModule(Module &M);
 
     void SetupInit();
+    void CollectFunctions();
+    void DumpFindFunctions(std::set<Function *> findFunc);
+    std::set<Function *> FindCandidateFuncsByFuncType(FunctionType *ft);
     void Execute(std::map<std::string, long> FuncNameCostMap);
     Function* getTargetFunctionName(Value *callVal);
+
+    /* global variables */
+    std::vector<Function *> AllFuncs;
+
 };
 
 #endif //COMAIR_FINDOUTERLOOP_H

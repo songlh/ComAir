@@ -36,6 +36,10 @@ FindOuterLoop::FindOuterLoop() : ModulePass(ID) {
 }
 
 
+void FindOuterLoop::SetupInit() {
+    CollectFunctions();
+}
+
 Function *FindOuterLoop::getTargetFunctionName(Value *calledVal) {
     SmallPtrSet<const GlobalValue *, 3> Visited;
 
@@ -80,6 +84,53 @@ Function *FindOuterLoop::getTargetFunctionName(Value *calledVal) {
 }
 
 
+void FindOuterLoop::CollectFunctions() {
+
+    for (Module::iterator FI = this->pModule->begin(); FI != this->pModule->end(); FI++) {
+        Function *F = &*FI;
+
+        for (Function::iterator BI = F->begin(); BI != F->end(); BI++) {
+
+            BasicBlock *BB = &*BI;
+
+            for (BasicBlock::iterator II = BB->begin(); II != BB->end(); II++) {
+                this->AllFuncs.push_back(F);
+                break;
+            }
+
+            break;
+        }
+    }
+}
+
+
+std::set<Function *> FindOuterLoop::FindCandidateFuncsByFuncType(FunctionType *ft) {
+    std::set<Function *> candidateFuncs;
+
+    for (std::vector<Function *>::iterator ai = this->AllFuncs.begin(), ie = this->AllFuncs.end();
+         ai != ie; ++ai) {
+
+        Function *currFunc = *ai;
+        FunctionType *currType = currFunc->getFunctionType();
+
+        if (currType == ft) {
+//            errs() << "Find candidate function:" << currFunc->getName() << "\n";
+            candidateFuncs.insert(currFunc);
+        }
+    }
+
+    return candidateFuncs;
+}
+
+
+void FindOuterLoop::DumpFindFunctions(std::set<Function *> findFunc) {
+
+    for (std::set<Function *>::iterator ai = findFunc.begin(), ie = findFunc.end(); ai != ie; ai++) {
+        Function *f = *ai;
+        errs() << "Candidate function name is " << f->getName() << "\n";
+    }
+}
+
 void FindOuterLoop::Execute(std::map<std::string, long> FuncNameCostMap) {
     std::map<std::string, std::set<Function *>> FuncNameMap;
 
@@ -119,7 +170,7 @@ void FindOuterLoop::Execute(std::map<std::string, long> FuncNameCostMap) {
                             } else {
                                 Value *callPointer = cs.getCalledValue();
                                 Function *targetFunc = getTargetFunctionName(callPointer);
-                                Value* sv = callPointer->stripPointerCasts();
+                                Value *sv = callPointer->stripPointerCasts();
 //                                StringRef fname = sv->getName();
 
                                 if (targetFunc) {
@@ -128,6 +179,8 @@ void FindOuterLoop::Execute(std::map<std::string, long> FuncNameCostMap) {
                                         if (CurrentMaxCost > FuncNameCostMap[targetFuncName])
                                             currentCallees.insert(callee);
                                     }
+
+
                                 } else if (dyn_cast<Function>(callPointer->stripPointerCasts())) {
                                     callee = dyn_cast<Function>(callPointer->stripPointerCasts());
                                     string calleeName = callee->getName();
@@ -135,10 +188,15 @@ void FindOuterLoop::Execute(std::map<std::string, long> FuncNameCostMap) {
                                         if (CurrentMaxCost > FuncNameCostMap[calleeName])
                                             currentCallees.insert(callee);
                                     }
-                                } else {
-                                    errs() << " Could not find callee, in function:" << FuncName << "\n";
-                                    Inst->dump();
 
+                                } else {
+//                                    errs() << " Could not find callee, in function:" << FuncName << "\n";
+//                                    Inst->dump();
+                                    CallInst *callInst = dyn_cast<CallInst>(Inst);
+                                    FunctionType *functionType = callInst->getFunctionType();
+                                    std::set<Function *> findFuncs = FindCandidateFuncsByFuncType(functionType);
+//                                    DumpFindFunctions(findFuncs);
+                                    currentCallees.insert(findFuncs.begin(), findFuncs.end());
                                 }
                             }
                         }
@@ -184,6 +242,9 @@ std::vector<std::string> split(const std::string &s, char delim) {
 bool FindOuterLoop::runOnModule(Module &M) {
 
     this->pModule = &M;
+
+    SetupInit();
+
     map<string, long> FuncNamesCostMap;
 
     if (strFileName.empty()) {
